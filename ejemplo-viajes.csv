@@ -1,0 +1,10 @@
+tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal
+1,2026-01-24,2026-02-03,familia,Analia; Marcelo,,Capao da Canoa,2026-01-24,2026-02-03
+2,2025-12-27,2026-01-02,placer,Rodo,,Chapadmalal,2025-12-27,2025-12-30
+2,2025-12-27,2026-01-02,placer,Rodo,,Azul,2025-12-30,2026-01-02
+3,2025-11-26,2025-12-07,placer,Rodo; Sofo; Nacho; Pulpo; Mati; Vico; Lucas,Crastoli Extravaganza,Bariloche,2025-11-26,2025-11-30
+3,2025-11-26,2025-12-07,placer,Rodo,Honeymoon,San Martin de los Andes,2025-11-30,2025-12-03
+3,2025-11-26,2025-12-07,placer,Rodo,Laguna Azul - Refugio Ilon,Pampa Linda,2025-12-04,2025-12-07
+4,2025-08-06,2025-08-12,placer,Rodo,,Corralco,2025-08-06,2025-08-12
+5,2025-06-20,2025-06-22,placer,Rodo; Lula; Fran; Bruno,,Olavarria,2025-06-20,2025-06-22
+6,2025-03-01,2025-03-04,evento,Rodo; Chano; Mack,Fuego Austral,Tandil,2025-03-01,2025-03-04

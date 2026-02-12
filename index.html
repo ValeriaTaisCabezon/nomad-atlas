@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nomad Atlas - Tu Diario de Viajes</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #d4a574; --secondary: #2a5a4a; --accent: #e85d75; --dark: #1a1a1a; --light: #f8f5f0; --border: #d4c5b0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Work Sans', sans-serif; background: var(--light); color: var(--dark); overflow-x: hidden; }
+        h1, h2, h3 { font-family: 'Playfair Display', serif; font-weight: 900; }
+        
+        .header { background: linear-gradient(135deg, var(--secondary) 0%, #1e4339 100%); color: white; padding: 2rem; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .logo { font-size: 2rem; font-weight: 900; }
+        .nav-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .nav-tab { padding: 0.75rem 1.5rem; background: rgba(255,255,255,0.1); border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: 500; transition: all 0.3s; }
+        .nav-tab:hover:not(:disabled) { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
+        .nav-tab.active { background: var(--primary); color: var(--dark); }
+        .nav-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .main-content { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        
+        .profile-section { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 2rem; border: 2px solid var(--border); }
+        .profile-header { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+        .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--primary) 0%, #c89456 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: white; }
+        .profile-info h2 { font-size: 2rem; color: var(--secondary); margin-bottom: 0.5rem; }
+        
+        .map-container { height: 70vh; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.12); margin-bottom: 2rem; }
+        #map { height: 100%; width: 100%; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 2rem; overflow-y: auto; }
+        .modal-content { background: white; border-radius: 20px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; }
+        .modal-header { padding: 2rem; border-bottom: 2px solid var(--border); position: sticky; top: 0; background: white; z-index: 10; }
+        .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--light); border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; }
+        .modal-close:hover { background: var(--primary); color: white; transform: rotate(90deg); }
+        .modal-body { padding: 2rem; }
+        .trip-detail-title { font-size: 2.5rem; color: var(--secondary); margin-bottom: 1rem; }
+        .trip-detail-meta { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; }
+        .trip-detail-meta-item { display: flex; align-items: center; gap: 0.5rem; }
+        .trip-detail-map { height: 400px; border-radius: 12px; overflow: hidden; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        .add-trip-section { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 2rem; border: 2px solid var(--border); }
+        .form-title { font-size: 1.8rem; margin-bottom: 1.5rem; color: var(--secondary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .form-section { margin-bottom: 2rem; padding: 1.5rem; background: var(--light); border-radius: 12px; }
+        .form-section-title { font-size: 1.2rem; margin-bottom: 1rem; color: var(--secondary); font-weight: 600; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: 600; margin-bottom: 0.5rem; color: var(--secondary); font-size: 0.9rem; text-transform: uppercase; }
+        input, textarea, select { padding: 0.875rem; border: 2px solid var(--border); border-radius: 8px; font-family: 'Work Sans', sans-serif; font-size: 1rem; transition: all 0.3s; }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(212,165,116,0.1); }
+        textarea { min-height: 100px; resize: vertical; }
+        
+        .people-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .person-tag { background: var(--primary); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+        .person-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 2px solid white; }
+        .person-tag button { background: rgba(255,255,255,0.3); border: none; width: 20px; height: 20px; border-radius: 50%; color: white; cursor: pointer; font-weight: bold; }
+        .suggested-people { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .suggested-person { background: var(--light); padding: 0.5rem 1rem; border: 2px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem; }
+        .suggested-person:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .destinations-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
+        .destination-item { background: white; padding: 1.5rem; border-radius: 12px; border: 2px solid var(--border); position: relative; }
+        .destination-item h4 { font-size: 1.1rem; color: var(--secondary); margin-bottom: 1rem; }
+        .btn-remove { position: absolute; top: 1rem; right: 1rem; background: #dc3545; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; transition: all 0.3s; }
+        .btn-remove:hover { background: #c82333; transform: scale(1.1); }
+        .btn-edit-destino { background: var(--secondary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; margin-top: 0.5rem; }
+        .btn-edit-destino:hover { background: #1e4339; }
+        
+        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, #c89456 100%); color: white; border: none; padding: 1rem 2rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; text-transform: uppercase; box-shadow: 0 4px 15px rgba(212,165,116,0.3); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212,165,116,0.4); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-secondary { background: var(--secondary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-secondary:hover { background: #1e4339; transform: translateY(-2px); }
+        .btn-edit { background: white; color: var(--secondary); border: 2px solid var(--border); padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-edit:hover { border-color: var(--primary); background: var(--light); }
+        
+        .file-input-wrapper { position: relative; overflow: hidden; width: 100%; }
+        .file-input-wrapper input[type=file] { position: absolute; left: -9999px; }
+        .file-input-label { display: flex; align-items: center; justify-content: center; padding: 0.875rem; background: var(--light); border: 2px dashed var(--border); border-radius: 8px; cursor: pointer; transition: all 0.3s; font-weight: 500; color: var(--secondary); }
+        .file-input-label:hover { border-color: var(--primary); background: white; }
+        .image-preview { width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-top: 1rem; }
+        
+        .timeline-year-container { margin-bottom: 4rem; background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .timeline-year-header { font-size: 2.5rem; color: var(--primary); margin-bottom: 2rem; text-align: center; }
+        .timeline-horizontal { position: relative; padding: 3rem 0; }
+        .timeline-line { position: absolute; top: 50%; left: 0; right: 0; height: 4px; background: var(--border); transform: translateY(-50%); }
+        .timeline-months { display: flex; justify-content: space-between; position: relative; }
+        .timeline-month { flex: 1; text-align: center; position: relative; }
+        .timeline-month-dot { width: 16px; height: 16px; background: var(--primary); border-radius: 50%; margin: 0 auto 0.5rem; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: relative; z-index: 2; }
+        .timeline-month-label { font-size: 0.85rem; font-weight: 600; color: var(--secondary); margin-bottom: 1rem; }
+        .timeline-month-trips { display: flex; flex-direction: column; gap: 0.75rem; align-items: center; }
+        .timeline-trip-mini { background: white; border: 2px solid var(--border); border-radius: 8px; padding: 0.5rem; min-width: 80px; max-width: 120px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .timeline-trip-mini:hover { transform: scale(1.1); border-color: var(--primary); box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 10; }
+        .timeline-trip-mini-image { width: 100%; height: 50px; object-fit: cover; border-radius: 4px; margin-bottom: 0.35rem; }
+        .timeline-trip-mini-title { font-size: 0.7rem; font-weight: 700; color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0.25rem; }
+        .timeline-trip-mini-meta { font-size: 0.65rem; color: #888; display: flex; align-items: center; justify-content: center; gap: 0.25rem; }
+        
+        .dashboard-section { margin-bottom: 3rem; }
+        .dashboard-section-title { font-size: 2rem; color: var(--secondary); margin-bottom: 2rem; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+        .metric-card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); transition: all 0.3s; }
+        .metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
+        .metric-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.8; }
+        .metric-value { font-size: 3.5rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; margin-bottom: 0.5rem; }
+        .metric-label { font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .metric-detail { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--secondary); }
+        
+        .top-destinations-row { display: flex; gap: 1.5rem; overflow-x: auto; padding: 1rem 0; }
+        .top-dest-card { background: white; padding: 2rem 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); min-width: 220px; flex-shrink: 0; text-align: center; transition: all 0.3s; }
+        .top-dest-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
+        .top-dest-name { font-size: 1.6rem; font-weight: 700; color: var(--secondary); margin-bottom: 1rem; }
+        .top-dest-count { font-size: 3rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
+        .top-dest-label { font-size: 0.8rem; color: #888; text-transform: uppercase; margin-top: 0.5rem; }
+        
+        .people-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
+        .person-metric-card { background: white; padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); transition: all 0.3s; }
+        .person-metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
+        .person-metric-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        .person-metric-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); flex-shrink: 0; }
+        .person-metric-info { flex: 1; }
+        .person-metric-name { font-size: 1.3rem; font-weight: 700; color: var(--secondary); margin-bottom: 0.25rem; }
+        .person-metric-main { font-size: 1.8rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
+        .person-metric-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .person-metric-stat { background: var(--light); padding: 1rem; border-radius: 12px; text-align: center; }
+        .person-metric-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--secondary); margin-bottom: 0.25rem; }
+        .person-metric-stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; }
+        
+        .wrapped-container { max-height: 85vh; overflow-y: auto; }
+        .wrapped-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
+        .wrapped-card { background: linear-gradient(135deg, var(--secondary) 0%, #1e4339 100%); color: white; border-radius: 14px; padding: 1.5rem; position: relative; overflow: hidden; min-height: 160px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.12); transition: all 0.3s; }
+        .wrapped-card:hover { transform: translateY(-3px); box-shadow: 0 6px 25px rgba(0,0,0,0.15); }
+        .wrapped-card-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.9; }
+        .wrapped-card-value { font-size: 2.5rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; margin-bottom: 0.25rem; line-height: 1; }
+        .wrapped-card-label { font-size: 0.95rem; opacity: 0.9; margin-bottom: 0.35rem; }
+        .wrapped-card-detail { font-size: 0.75rem; opacity: 0.75; }
+        .wrapped-places-card { grid-column: 1 / -1; max-height: 200px; }
+        .wrapped-places-grid { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; max-height: 100px; overflow-y: auto; }
+        .wrapped-place-tag { background: var(--primary); color: var(--dark); padding: 0.3rem 0.7rem; border-radius: 14px; font-weight: 600; font-size: 0.75rem; }
+        
+        .trips-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+        .trip-list-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); transition: all 0.3s; border: 2px solid var(--border); }
+        .trip-list-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-color: var(--primary); }
+        .trip-list-card-image { width: 100%; height: 200px; object-fit: cover; cursor: pointer; }
+        .trip-list-card-content { padding: 1.5rem; cursor: pointer; }
+        .trip-list-card-title { font-size: 1.4rem; color: var(--secondary); margin-bottom: 0.75rem; font-weight: 700; }
+        .trip-list-card-date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+        .trip-list-card-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .trip-list-card-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: #888; }
+        
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
+        .empty-state-icon { font-size: 5rem; margin-bottom: 1rem; opacity: 0.3; }
+        .empty-state-text { font-size: 1.2rem; }
+        
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .csv-import { margin-top: 1rem; padding: 1.5rem; background: var(--light); border-radius: 12px; border: 2px dashed var(--border); }
+        .csv-import h4 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--secondary); }
+        .csv-help { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; line-height: 1.4; }
+        .csv-example { font-size: 0.8rem; font-family: monospace; background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; overflow-x: auto; }
+        
+        @media (max-width: 768px) {
+            .header-content { flex-direction: column; text-align: center; }
+            .form-grid { grid-template-columns: 1fr; }
+            .wrapped-card-value { font-size: 2rem; }
+            .timeline-months { flex-direction: column; gap: 2rem; }
+            .timeline-line { display: none; }
+            .top-destinations-row { flex-direction: column; }
+            .top-dest-card { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const geocodePlace = async (place) => {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}&limit=1`);
+                const data = await response.json();
+                if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+            } catch (error) { console.error('Geocoding error:', error); }
+            return null;
+        };
+
+        const calculateDistance = (lat1, lon1, lat2, lon2) => {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        };
+
+        const getMotivoEmoji = (motivo) => {
+            const emojis = { 'placer': '🏖️', 'negocios': '💼', 'evento': '🎉', 'familia': '👨‍👩‍👧‍👦', 'estudio': '📚', 'otro': '🌟' };
+            return emojis[motivo] || '✈️';
+        };
+
+        const parseCSV = async (text) => {
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length < 2) return [];
+            
+            const trips = [];
+            let currentTrip = null;
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                
+                if (values.length >= 4) {
+                    const fechaInicio = values[0];
+                    const fechaFinal = values[1] || fechaInicio;
+                    const motivo = values[2] || 'placer';
+                    const personas = values[3] ? values[3].split(';').map(n => ({ nombre: n.trim(), foto: null })) : [];
+                    const lugar = values[4];
+                    const notas = values[5] || '';
+                    const destinoFechaInicio = values[6] || fechaInicio;
+                    const destinoFechaFinal = values[7] || fechaFinal;
+                    
+                    if (!currentTrip || currentTrip.fechaInicio !== fechaInicio) {
+                        if (currentTrip) trips.push(currentTrip);
+                        currentTrip = {
+                            id: Date.now() + i,
+                            fechaInicio,
+                            fechaFinal,
+                            motivo,
+                            personas,
+                            destinos: [],
+                            notas,
+                            createdAt: new Date().toISOString()
+                        };
+                    }
+                    
+                    if (lugar) {
+                        const coordinates = await geocodePlace(lugar);
+                        currentTrip.destinos.push({
+                            lugar,
+                            fechaInicio: destinoFechaInicio,
+                            fechaFinal: destinoFechaFinal,
+                            foto: null,
+                            coordinates
+                        });
+                    }
+                }
+            }
+            
+            if (currentTrip && currentTrip.destinos.length > 0) trips.push(currentTrip);
+            return trips;
+        };
+
+        const ProfileView = ({ profile, onUpdateProfile }) => {
+            const [isEditing, setIsEditing] = useState(false);
+            const [formData, setFormData] = useState(profile || { nombre: '', ubicacion: '', emoji: '🌍' });
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onUpdateProfile(formData);
+                setIsEditing(false);
+            };
+
+            if (!profile && !isEditing) {
+                return (
+                    <div className="profile-section">
+                        <div className="empty-state">
+                            <div className="empty-state-icon">👤</div>
+                            <div className="empty-state-text">Crea tu perfil para comenzar</div>
+                            <button className="btn-primary" onClick={() => setIsEditing(true)} style={{marginTop: '1rem'}}>Crear Perfil</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (isEditing) {
+                return (
+                    <div className="profile-section">
+                        <h2 className="form-title">Tu Perfil</h2>
+                        <form onSubmit={handleSubmit}>
+                            <div className="form-grid">
+                                <div className="form-group"><label>Nombre</label><input type="text" value={formData.nombre} onChange={(e) => setFormData({...formData, nombre: e.target.value})} required /></div>
+                                <div className="form-group"><label>Ciudad de origen</label><input type="text" value={formData.ubicacion} onChange={(e) => setFormData({...formData, ubicacion: e.target.value})} placeholder="Buenos Aires, Argentina" required /></div>
+                                <div className="form-group"><label>Emoji favorito</label><input type="text" value={formData.emoji} onChange={(e) => setFormData({...formData, emoji: e.target.value})} maxLength="2" /></div>
+                            </div>
+                            <div style={{display: 'flex', gap: '1rem', marginTop: '1rem'}}>
+                                <button type="submit" className="btn-primary">Guardar</button>
+                                {profile && <button type="button" className="btn-secondary" onClick={() => setIsEditing(false)}>Cancelar</button>}
+                            </div>
+                        </form>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="profile-section">
+                    <div className="profile-header">
+                        <div className="profile-avatar">{profile.emoji}</div>
+                        <div className="profile-info">
+                            <h2>{profile.nombre}</h2>
+                            <div>📍 {profile.ubicacion}</div>
+                        </div>
+                        <button className="btn-secondary" onClick={() => setIsEditing(true)}>Editar Perfil</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const TripCard = ({ trip, onClick, showEditButton, onEdit }) => {
+            const firstDestino = trip.destinos[0];
+            const duracion = trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1;
+            
+            return (
+                <div className="trip-list-card">
+                    <div onClick={onClick}>
+                        {firstDestino?.foto && <img src={firstDestino.foto} alt={firstDestino.lugar} className="trip-list-card-image" />}
+                        <div className="trip-list-card-content">
+                            <h3 className="trip-list-card-title">{trip.destinos.map(d => d.lugar).join(' → ')}</h3>
+                            <div className="trip-list-card-date">{new Date(trip.fechaInicio).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                            <div className="trip-list-card-meta">
+                                <div className="trip-list-card-meta-item"><span>{getMotivoEmoji(trip.motivo)}</span><span>{trip.motivo}</span></div>
+                                <div className="trip-list-card-meta-item"><span>⏱️</span><span>{duracion}d</span></div>
+                                <div className="trip-list-card-meta-item"><span>📍</span><span>{trip.destinos.length}</span></div>
+                                {trip.personas.length > 0 && <div className="trip-list-card-meta-item"><span>👥</span><span>{trip.personas.length}</span></div>}
+                            </div>
+                        </div>
+                    </div>
+                    {showEditButton && (
+                        <div style={{padding: '0 1.5rem 1.5rem'}}>
+                            <button className="btn-edit" onClick={(e) => { e.stopPropagation(); onEdit(trip); }} style={{width: '100%'}}>✏️ Editar Viaje</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const MapView = ({ trips, homeCoords, onTripClick }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+
+            useEffect(() => {
+                if (!mapRef.current || mapInstanceRef.current) return;
+                const map = L.map(mapRef.current).setView([20, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+                mapInstanceRef.current = map;
+                return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
+            }, []);
+
+            useEffect(() => {
+                if (!mapInstanceRef.current) return;
+                mapInstanceRef.current.eachLayer(layer => { if (layer instanceof L.Marker) mapInstanceRef.current.removeLayer(layer); });
+                const bounds = [];
+                
+                if (homeCoords) {
+                    const homeMarker = L.marker([homeCoords.lat, homeCoords.lng], {
+                        icon: L.divIcon({
+                            className: '',
+                            html: '<div style="width:40px;height:40px;border-radius:50%;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);background-color:#2a5a4a;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.2rem;">🏠</div>',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        })
+                    }).addTo(mapInstanceRef.current);
+                    homeMarker.bindPopup('<b>🏠 Tu casa</b>');
+                    bounds.push([homeCoords.lat, homeCoords.lng]);
+                }
+                
+                trips.forEach(trip => {
+                    const firstDestino = trip.destinos[0];
+                    if (firstDestino?.coordinates) {
+                        const markerHtml = `<div style="width:40px;height:40px;border-radius:50%;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.3);background-size:cover;background-position:center;${firstDestino.foto ? `background-image:url(${firstDestino.foto});` : 'background-color:#e85d75;'}display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:1.2rem;cursor:pointer;">${!firstDestino.foto ? '📍' : ''}</div>`;
+                        
+                        const marker = L.marker([firstDestino.coordinates.lat, firstDestino.coordinates.lng], {
+                            icon: L.divIcon({ className: '', html: markerHtml, iconSize: [40, 40], iconAnchor: [20, 20] })
+                        }).addTo(mapInstanceRef.current);
+                        
+                        marker.on('click', () => onTripClick(trip));
+                        marker.bindPopup(`<b>${trip.destinos.map(d => d.lugar).join(' → ')}</b><br>${getMotivoEmoji(trip.motivo)} ${trip.motivo}`);
+                        bounds.push([firstDestino.coordinates.lat, firstDestino.coordinates.lng]);
+                    }
+                });
+                
+                if (bounds.length > 0) mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+            }, [trips, homeCoords, onTripClick]);
+
+            return <div id="map" ref={mapRef}></div>;
+        };
+
+        const TripDetailModal = ({ trip, onClose, homeCoords }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+
+            useEffect(() => {
+                if (!mapRef.current || mapInstanceRef.current) return;
+                const map = L.map(mapRef.current).setView([20, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+                mapInstanceRef.current = map;
+                const bounds = [];
+                const coords = [];
+                
+                if (homeCoords) {
+                    L.marker([homeCoords.lat, homeCoords.lng]).addTo(map).bindPopup('<b>🏠 Origen</b>');
+                    bounds.push([homeCoords.lat, homeCoords.lng]);
+                    coords.push([homeCoords.lat, homeCoords.lng]);
+                }
+                
+                trip.destinos.forEach(destino => {
+                    if (destino.coordinates) {
+                        L.marker([destino.coordinates.lat, destino.coordinates.lng]).addTo(map).bindPopup(`<b>${destino.lugar}</b>`);
+                        bounds.push([destino.coordinates.lat, destino.coordinates.lng]);
+                        coords.push([destino.coordinates.lat, destino.coordinates.lng]);
+                    }
+                });
+                
+                if (homeCoords) coords.push([homeCoords.lat, homeCoords.lng]);
+                if (coords.length > 1) L.polyline(coords, { color: '#d4a574', weight: 3, opacity: 0.7, dashArray: '10, 10' }).addTo(map);
+                if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
+                return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
+            }, [trip, homeCoords]);
+
+            const duracion = trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1;
+
+            return (
+                <div className="modal-overlay" onClick={onClose}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <button className="modal-close" onClick={onClose}>×</button>
+                        </div>
+                        <div className="modal-body">
+                            <h2 className="trip-detail-title">{trip.destinos.map(d => d.lugar).join(' → ')}</h2>
+                            <div className="trip-detail-meta">
+                                <div className="trip-detail-meta-item"><span>📅</span><span>{new Date(trip.fechaInicio).toLocaleDateString('es-ES')}{trip.fechaFinal && ` - ${new Date(trip.fechaFinal).toLocaleDateString('es-ES')}`}</span></div>
+                                <div className="trip-detail-meta-item"><span>{getMotivoEmoji(trip.motivo)}</span><span>{trip.motivo}</span></div>
+                                <div className="trip-detail-meta-item"><span>⏱️</span><span>{duracion} día{duracion !== 1 ? 's' : ''}</span></div>
+                                <div className="trip-detail-meta-item"><span>📍</span><span>{trip.destinos.length} destino{trip.destinos.length !== 1 ? 's' : ''}</span></div>
+                            </div>
+                            {trip.personas && trip.personas.length > 0 && (
+                                <div style={{marginBottom: '2rem'}}>
+                                    <h3 style={{fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--secondary)'}}>👥 Acompañantes</h3>
+                                    <div className="people-container">
+                                        {trip.personas.map(person => (
+                                            <div key={person.nombre} className="person-tag">
+                                                {person.foto && <img src={person.foto} alt={person.nombre} className="person-avatar" />}
+                                                {person.nombre}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="trip-detail-map" ref={mapRef}></div>
+                            <h3 style={{fontSize: '1.5rem', marginBottom: '1.5rem', color: 'var(--secondary)'}}>🗺️ Destinos</h3>
+                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem'}}>
+                                {trip.destinos.map((destino, index) => (
+                                    <div key={index} style={{background: 'var(--light)', borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--border)'}}>
+                                        {destino.foto && <img src={destino.foto} alt={destino.lugar} style={{width: '100%', height: '150px', objectFit: 'cover'}} />}
+                                        <div style={{padding: '1rem'}}>
+                                            <div style={{fontSize: '1.1rem', fontWeight: '700', color: 'var(--secondary)', marginBottom: '0.5rem'}}>{destino.lugar}</div>
+                                            {destino.fechaInicio && <div style={{fontSize: '0.85rem', color: '#666'}}>{new Date(destino.fechaInicio).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}{destino.fechaFinal && ` - ${new Date(destino.fechaFinal).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}`}</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {trip.notas && (
+                                <div style={{marginTop: '2rem', padding: '1.5rem', background: 'var(--light)', borderRadius: '12px'}}>
+                                    <h4 style={{fontSize: '1.1rem', marginBottom: '0.75rem', color: 'var(--secondary)'}}>📝 Notas</h4>
+                                    <p style={{color: '#666', lineHeight: '1.6'}}>{trip.notas}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit }) => {
+            const [formData, setFormData] = useState(editingTrip || { fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+            const [currentDestino, setCurrentDestino] = useState({ lugar: '', fechaInicio: '', fechaFinal: '', foto: null });
+            const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
+            const [previewUrl, setPreviewUrl] = useState(null);
+            const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
+            const [isGeocoding, setIsGeocoding] = useState(false);
+            const [editingDestinoIndex, setEditingDestinoIndex] = useState(null);
+            const [isImportingCSV, setIsImportingCSV] = useState(false);
+
+            useEffect(() => { if (editingTrip) setFormData(editingTrip); }, [editingTrip]);
+
+            const handleAddOrUpdateDestino = async () => {
+                if (!currentDestino.lugar) return;
+                setIsGeocoding(true);
+                const coordinates = currentDestino.coordinates || await geocodePlace(currentDestino.lugar);
+                const updatedDestino = { ...currentDestino, coordinates };
+                
+                if (editingDestinoIndex !== null) {
+                    const newDestinos = [...formData.destinos];
+                    newDestinos[editingDestinoIndex] = updatedDestino;
+                    setFormData({ ...formData, destinos: newDestinos });
+                    setEditingDestinoIndex(null);
+                } else {
+                    setFormData({ ...formData, destinos: [...formData.destinos, updatedDestino] });
+                }
+                setCurrentDestino({ lugar: '', fechaInicio: '', fechaFinal: '', foto: null });
+                setPreviewUrl(null);
+                setIsGeocoding(false);
+            };
+
+            const handleEditDestino = (index) => {
+                setCurrentDestino(formData.destinos[index]);
+                setPreviewUrl(formData.destinos[index].foto);
+                setEditingDestinoIndex(index);
+            };
+
+            const handleRemoveDestino = (index) => setFormData({ ...formData, destinos: formData.destinos.filter((_, i) => i !== index) });
+
+            const handleSelectSavedDestination = (savedDest) => {
+                setCurrentDestino({ lugar: savedDest.lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: savedDest.coordinates });
+            };
+
+            const handleAddPerson = (personData) => {
+                const nombre = typeof personData === 'string' ? personData : personData.nombre;
+                const foto = typeof personData === 'string' ? null : personData.foto;
+                if (!nombre || formData.personas.some(p => p.nombre === nombre)) return;
+                setFormData({ ...formData, personas: [...formData.personas, { nombre, foto }] });
+                setCurrentPerson({ nombre: '', foto: null });
+                setPersonPreviewUrl(null);
+            };
+
+            const handleRemovePerson = (nombre) => setFormData({ ...formData, personas: formData.personas.filter(p => p.nombre !== nombre) });
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setCurrentDestino({ ...currentDestino, foto: reader.result }); setPreviewUrl(reader.result); };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handlePersonPhotoChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => { setCurrentPerson({ ...currentPerson, foto: reader.result }); setPersonPreviewUrl(reader.result); };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleCSVImport = async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    setIsImportingCSV(true);
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const csv = event.target.result;
+                        const parsedTrips = await parseCSV(csv);
+                        if (parsedTrips.length > 0) {
+                            parsedTrips.forEach(trip => onAddTrip(trip));
+                            alert(`✅ Se importaron ${parsedTrips.length} viajes exitosamente!`);
+                        } else {
+                            alert('No se pudieron procesar los viajes del CSV. Verifica el formato.');
+                        }
+                        setIsImportingCSV(false);
+                        e.target.value = '';
+                    };
+                    reader.readAsText(file);
+                }
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (formData.destinos.length === 0) { alert('Agrega al menos un destino'); return; }
+                const trip = editingTrip ? { ...formData } : { ...formData, id: Date.now(), createdAt: new Date().toISOString() };
+                onAddTrip(trip);
+                if (!editingTrip) setFormData({ fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+            };
+
+            const suggestedPeople = allPeople.filter(p => !formData.personas.some(fp => fp.nombre === p.nombre));
+            const savedDestinations = allDestinations.filter(d => !formData.destinos.some(fd => fd.lugar === d.lugar));
+
+            return (
+                <div className="add-trip-section">
+                    <h2 className="form-title">
+                        <span>{editingTrip ? '✏️ Editar Viaje' : '✈️ Agregar Nuevo Viaje'}</span>
+                        {editingTrip && <button className="btn-edit" onClick={onCancelEdit}>Cancelar</button>}
+                    </h2>
+                    
+                    {!editingTrip && (
+                        <div className="csv-import">
+                            <h4>📤 Importar viajes desde CSV</h4>
+                            <div className="csv-help">Formato: Cada línea es un destino. Viajes con la misma fecha de inicio se agrupan automáticamente.</div>
+                            <div className="csv-example">fechaInicio,fechaFinal,motivo,personas(separadas por ;),lugar,notas,destinoFechaInicio,destinoFechaFinal</div>
+                            <input type="file" accept=".csv" onChange={handleCSVImport} disabled={isImportingCSV} />
+                            {isImportingCSV && <div style={{marginTop: '0.5rem', color: 'var(--secondary)'}}>⏳ Importando viajes... Esto puede tardar unos segundos.</div>}
+                        </div>
+                    )}
+                    
+                    <form onSubmit={handleSubmit}>
+                        <div className="form-section">
+                            <h3 className="form-section-title">Información General</h3>
+                            <div className="form-grid">
+                                <div className="form-group"><label>Fecha Inicio *</label><input type="date" value={formData.fechaInicio} onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })} required /></div>
+                                <div className="form-group"><label>Fecha Final</label><input type="date" value={formData.fechaFinal} onChange={(e) => setFormData({ ...formData, fechaFinal: e.target.value })} min={formData.fechaInicio} /></div>
+                                <div className="form-group">
+                                    <label>Motivo del viaje</label>
+                                    <select value={formData.motivo} onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}>
+                                        <option value="placer">🏖️ Placer</option>
+                                        <option value="negocios">💼 Negocios</option>
+                                        <option value="evento">🎉 Evento</option>
+                                        <option value="familia">👨‍👩‍👧‍👦 Familia</option>
+                                        <option value="estudio">📚 Estudio</option>
+                                        <option value="otro">🌟 Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-section">
+                            <h3 className="form-section-title">Destinos</h3>
+                            
+                            {savedDestinations.length > 0 && (
+                                <div style={{marginBottom: '1rem'}}>
+                                    <label>Seleccionar destino guardado:</label>
+                                    <div className="suggested-people">
+                                        {savedDestinations.slice(0, 10).map(dest => (
+                                            <div key={dest.lugar} className="suggested-person" onClick={() => handleSelectSavedDestination(dest)}>📍 {dest.lugar}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="form-grid">
+                                <div className="form-group"><label>Lugar</label><input type="text" value={currentDestino.lugar} onChange={(e) => setCurrentDestino({...currentDestino, lugar: e.target.value})} placeholder="París, Francia" /></div>
+                                <div className="form-group"><label>Fecha inicio en destino</label><input type="date" value={currentDestino.fechaInicio} onChange={(e) => setCurrentDestino({...currentDestino, fechaInicio: e.target.value})} min={formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
+                                <div className="form-group"><label>Fecha final en destino</label><input type="date" value={currentDestino.fechaFinal} onChange={(e) => setCurrentDestino({...currentDestino, fechaFinal: e.target.value})} min={currentDestino.fechaInicio || formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
+                                <div className="form-group">
+                                    <label>Foto del destino</label>
+                                    <div className="file-input-wrapper">
+                                        <input type="file" id="destino-photo" accept="image/*" onChange={handleFileChange} />
+                                        <label htmlFor="destino-photo" className="file-input-label">📸 {currentDestino.foto ? 'Cambiar foto' : 'Seleccionar foto'}</label>
+                                    </div>
+                                    {previewUrl && <img src={previewUrl} alt="Preview" className="image-preview" />}
+                                </div>
+                            </div>
+                            <button type="button" className="btn-secondary" onClick={handleAddOrUpdateDestino} disabled={!currentDestino.lugar || isGeocoding} style={{marginTop: '1rem'}}>
+                                {isGeocoding ? <span className="loading"></span> : (editingDestinoIndex !== null ? '💾 Actualizar Destino' : '+ Agregar Destino')}
+                            </button>
+
+                            {formData.destinos.length > 0 && (
+                                <div className="destinations-list">
+                                    {formData.destinos.map((destino, index) => (
+                                        <div key={index} className="destination-item">
+                                            <button type="button" className="btn-remove" onClick={() => handleRemoveDestino(index)}>×</button>
+                                            <h4>📍 {destino.lugar}</h4>
+                                            {(destino.fechaInicio || destino.fechaFinal) && <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem'}}>{destino.fechaInicio && new Date(destino.fechaInicio).toLocaleDateString('es-ES')}{destino.fechaFinal && ` - ${new Date(destino.fechaFinal).toLocaleDateString('es-ES')}`}</p>}
+                                            {destino.foto && <img src={destino.foto} alt={destino.lugar} className="image-preview" />}
+                                            <button type="button" className="btn-edit-destino" onClick={() => handleEditDestino(index)}>✏️ Editar Destino</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-section">
+                            <h3 className="form-section-title">Acompañantes</h3>
+                            <div className="form-grid">
+                                <div className="form-group"><label>Nombre</label><input type="text" value={currentPerson.nombre} onChange={(e) => setCurrentPerson({...currentPerson, nombre: e.target.value})} placeholder="Nombre de la persona" onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddPerson(currentPerson); } }} /></div>
+                                <div className="form-group">
+                                    <label>Foto (opcional)</label>
+                                    <div className="file-input-wrapper">
+                                        <input type="file" id="person-photo" accept="image/*" onChange={handlePersonPhotoChange} />
+                                        <label htmlFor="person-photo" className="file-input-label">📸 {currentPerson.foto ? 'Cambiar foto' : 'Seleccionar foto'}</label>
+                                    </div>
+                                    {personPreviewUrl && <img src={personPreviewUrl} alt="Preview" className="image-preview" style={{height: '100px'}} />}
+                                </div>
+                            </div>
+                            <button type="button" className="btn-secondary" onClick={() => handleAddPerson(currentPerson)} style={{marginTop: '1rem'}}>+ Agregar Persona</button>
+
+                            {suggestedPeople.length > 0 && (
+                                <div>
+                                    <label style={{marginTop: '1rem', display: 'block'}}>Personas frecuentes:</label>
+                                    <div className="suggested-people">
+                                        {suggestedPeople.map(person => (
+                                            <div key={person.nombre} className="suggested-person" onClick={() => handleAddPerson(person)}>
+                                                {person.foto && <img src={person.foto} alt={person.nombre} className="person-avatar" />}
+                                                {person.nombre}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.personas.length > 0 && (
+                                <div className="people-container">
+                                    {formData.personas.map(person => (
+                                        <div key={person.nombre} className="person-tag">
+                                            {person.foto && <img src={person.foto} alt={person.nombre} className="person-avatar" />}
+                                            {person.nombre}
+                                            <button type="button" onClick={() => handleRemovePerson(person.nombre)}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-section">
+                            <h3 className="form-section-title">Notas adicionales</h3>
+                            <textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })} placeholder="Actividades, recomendaciones, presupuesto..." />
+                        </div>
+
+                        <button type="submit" className="btn-primary" style={{marginTop: '1rem'}}>
+                            {editingTrip ? '💾 Guardar Cambios' : '✈️ Guardar Viaje'}
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        const TimelineView = ({ trips, onTripClick }) => {
+            if (trips.length === 0) return <div className="empty-state"><div className="empty-state-icon">📅</div><div className="empty-state-text">No hay viajes registrados aún</div></div>;
+            const tripsByYear = {};
+            trips.forEach(trip => {
+                const year = new Date(trip.fechaInicio).getFullYear();
+                if (!tripsByYear[year]) tripsByYear[year] = {};
+                const month = new Date(trip.fechaInicio).getMonth();
+                if (!tripsByYear[year][month]) tripsByYear[year][month] = [];
+                tripsByYear[year][month].push(trip);
+            });
+            const years = Object.keys(tripsByYear).sort((a, b) => b - a);
+
+            return (
+                <div>
+                    {years.map(year => {
+                        const months = Array.from({ length: 12 }, (_, i) => ({
+                            index: i,
+                            name: new Date(year, i).toLocaleDateString('es-ES', { month: 'short' }),
+                            trips: tripsByYear[year][i] || []
+                        }));
+
+                        return (
+                            <div key={year} className="timeline-year-container">
+                                <h2 className="timeline-year-header">{year}</h2>
+                                <div className="timeline-horizontal">
+                                    <div className="timeline-line"></div>
+                                    <div className="timeline-months">
+                                        {months.map(month => (
+                                            <div key={month.index} className="timeline-month">
+                                                <div className="timeline-month-dot"></div>
+                                                <div className="timeline-month-label">{month.name}</div>
+                                                <div className="timeline-month-trips">
+                                                    {month.trips.map(trip => {
+                                                        const firstDestino = trip.destinos[0];
+                                                        const duracion = trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1;
+                                                        return (
+                                                            <div key={trip.id} className="timeline-trip-mini" onClick={() => onTripClick(trip)}>
+                                                                {firstDestino?.foto && <img src={firstDestino.foto} alt={firstDestino.lugar} className="timeline-trip-mini-image" />}
+                                                                <div className="timeline-trip-mini-title">{trip.destinos.map(d => d.lugar).join(', ')}</div>
+                                                                <div className="timeline-trip-mini-meta">
+                                                                    <span>{getMotivoEmoji(trip.motivo)}</span>
+                                                                    <span>{duracion}d</span>
+                                                                    <span>📍{trip.destinos.length}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        const DashboardView = ({ trips, homeCoords }) => {
+            if (trips.length === 0) return <div className="empty-state"><div className="empty-state-icon">📊</div><div className="empty-state-text">Agrega viajes para ver tus métricas</div></div>;
+
+            const totalTrips = trips.length;
+            const allDestinations = trips.flatMap(t => t.destinos);
+            const uniquePlaces = new Set(allDestinations.map(d => d.lugar)).size;
+            
+            let totalKm = 0;
+            if (homeCoords) {
+                trips.forEach(trip => {
+                    let lastCoords = homeCoords;
+                    trip.destinos.forEach(destino => {
+                        if (destino.coordinates) {
+                            totalKm += calculateDistance(lastCoords.lat, lastCoords.lng, destino.coordinates.lat, destino.coordinates.lng);
+                            lastCoords = destino.coordinates;
+                        }
+                    });
+                    totalKm += calculateDistance(lastCoords.lat, lastCoords.lng, homeCoords.lat, homeCoords.lng);
+                });
+            }
+            
+            const placeCount = {};
+            allDestinations.forEach(d => { placeCount[d.lugar] = (placeCount[d.lugar] || 0) + 1; });
+            const topDestinations = Object.entries(placeCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const totalDays = trips.reduce((sum, t) => sum + (t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1), 0);
+            const motivoCount = {};
+            trips.forEach(t => { motivoCount[t.motivo] = (motivoCount[t.motivo] || 0) + 1; });
+            const favoriteMotivo = Object.entries(motivoCount).sort((a, b) => b[1] - a[1])[0];
+
+            const peopleStats = {};
+            trips.forEach(trip => {
+                const duracion = trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1;
+                trip.personas.forEach(person => {
+                    if (!peopleStats[person.nombre]) peopleStats[person.nombre] = { trips: 0, days: 0, places: new Set(), foto: person.foto };
+                    peopleStats[person.nombre].trips += 1;
+                    peopleStats[person.nombre].days += duracion;
+                    trip.destinos.forEach(d => peopleStats[person.nombre].places.add(d.lugar));
+                });
+            });
+            const peopleArray = Object.entries(peopleStats).map(([name, stats]) => ({ name, trips: stats.trips, days: stats.days, places: stats.places.size, foto: stats.foto })).sort((a, b) => b.trips - a.trips);
+
+            return (
+                <div>
+                    <div className="dashboard-section">
+                        <h2 className="dashboard-section-title">📊 Resumen General</h2>
+                        <div className="dashboard-grid">
+                            <div className="metric-card">
+                                <div className="metric-icon">✈️</div>
+                                <div className="metric-value">{totalTrips}</div>
+                                <div className="metric-label">Viajes Totales</div>
+                                <div className="metric-detail">{totalDays} días viajando</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-icon">🗺️</div>
+                                <div className="metric-value">{uniquePlaces}</div>
+                                <div className="metric-label">Lugares Únicos</div>
+                            </div>
+                            <div className="metric-card">
+                                <div className="metric-icon">🌍</div>
+                                <div className="metric-value">{Math.round(totalKm).toLocaleString()}</div>
+                                <div className="metric-label">Kilómetros</div>
+                                <div className="metric-detail">{(totalKm / 40075).toFixed(2)}x la vuelta al mundo</div>
+                            </div>
+                            {favoriteMotivo && (
+                                <div className="metric-card">
+                                    <div className="metric-icon">{getMotivoEmoji(favoriteMotivo[0])}</div>
+                                    <div className="metric-value">{favoriteMotivo[1]}</div>
+                                    <div className="metric-label">Motivo Principal</div>
+                                    <div className="metric-detail">{favoriteMotivo[0]}</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {topDestinations.length > 0 && (
+                        <div className="dashboard-section">
+                            <h2 className="dashboard-section-title">🏆 Top 5 Destinos Más Visitados</h2>
+                            <div className="top-destinations-row">
+                                {topDestinations.map(([place, count]) => (
+                                    <div key={place} className="top-dest-card">
+                                        <div className="top-dest-name">{place}</div>
+                                        <div className="top-dest-count">{count}</div>
+                                        <div className="top-dest-label">Visitas</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {peopleArray.length > 0 && (
+                        <div className="dashboard-section">
+                            <h2 className="dashboard-section-title">👥 Compañeros de Viaje</h2>
+                            <div className="people-metrics">
+                                {peopleArray.map(person => (
+                                    <div key={person.name} className="person-metric-card">
+                                        <div className="person-metric-header">
+                                            {person.foto ? (
+                                                <img src={person.foto} alt={person.name} className="person-metric-avatar" />
+                                            ) : (
+                                                <div className="person-metric-avatar" style={{background: 'linear-gradient(135deg, var(--primary) 0%, #c89456 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: 'white'}}>
+                                                    {person.name.charAt(0)}
+                                                </div>
+                                            )}
+                                            <div className="person-metric-info">
+                                                <div className="person-metric-name">{person.name}</div>
+                                                <div className="person-metric-main">{person.trips} viajes</div>
+                                            </div>
+                                        </div>
+                                        <div className="person-metric-stats">
+                                            <div className="person-metric-stat">
+                                                <div className="person-metric-stat-value">{person.days}</div>
+                                                <div className="person-metric-stat-label">Días juntos</div>
+                                            </div>
+                                            <div className="person-metric-stat">
+                                                <div className="person-metric-stat-value">{person.places}</div>
+                                                <div className="person-metric-stat-label">Lugares</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const WrappedView = ({ trips, year }) => {
+            const yearTrips = trips.filter(t => new Date(t.fechaInicio).getFullYear() === year);
+            if (yearTrips.length === 0) return <div className="empty-state"><div className="empty-state-icon">🎁</div><div className="empty-state-text">No hay viajes en {year}</div></div>;
+
+            const allDestinations = yearTrips.flatMap(t => t.destinos);
+            const uniquePlaces = [...new Set(allDestinations.map(d => d.lugar))];
+            const totalDays = yearTrips.reduce((sum, t) => sum + (t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1), 0);
+            let totalKm = 0;
+            const destinationsWithCoords = allDestinations.filter(d => d.coordinates);
+            for (let i = 0; i < destinationsWithCoords.length - 1; i++) {
+                const d1 = destinationsWithCoords[i].coordinates;
+                const d2 = destinationsWithCoords[i + 1].coordinates;
+                totalKm += calculateDistance(d1.lat, d1.lng, d2.lat, d2.lng);
+            }
+            const allPeople = [...new Set(yearTrips.flatMap(t => t.personas.map(p => p.nombre)))];
+            const avgDaysPerTrip = Math.round(totalDays / yearTrips.length);
+
+            return (
+                <div className="wrapped-container">
+                    <div className="wrapped-gallery">
+                        <div className="wrapped-card">
+                            <div className="wrapped-card-icon">✈️</div>
+                            <div className="wrapped-card-value">{yearTrips.length}</div>
+                            <div className="wrapped-card-label">Viajes</div>
+                            <div className="wrapped-card-detail">Un año lleno de aventuras</div>
+                        </div>
+                        <div className="wrapped-card">
+                            <div className="wrapped-card-icon">🗺️</div>
+                            <div className="wrapped-card-value">{uniquePlaces.length}</div>
+                            <div className="wrapped-card-label">Lugares</div>
+                            <div className="wrapped-card-detail">Cada uno único</div>
+                        </div>
+                        <div className="wrapped-card">
+                            <div className="wrapped-card-icon">📅</div>
+                            <div className="wrapped-card-value">{totalDays}</div>
+                            <div className="wrapped-card-label">Días viajando</div>
+                            <div className="wrapped-card-detail">~{avgDaysPerTrip} días/viaje</div>
+                        </div>
+                        <div className="wrapped-card">
+                            <div className="wrapped-card-icon">🌍</div>
+                            <div className="wrapped-card-value">{Math.round(totalKm / 1000)}K</div>
+                            <div className="wrapped-card-label">Kilómetros</div>
+                            <div className="wrapped-card-detail">{(totalKm / 40075).toFixed(2)}x la vuelta al mundo</div>
+                        </div>
+                        {allPeople.length > 0 && (
+                            <div className="wrapped-card">
+                                <div className="wrapped-card-icon">👥</div>
+                                <div className="wrapped-card-value">{allPeople.length}</div>
+                                <div className="wrapped-card-label">Compañeros</div>
+                                <div className="wrapped-card-detail">Momentos compartidos</div>
+                            </div>
+                        )}
+                        <div className="wrapped-card wrapped-places-card">
+                            <div className="wrapped-card-icon">🏆</div>
+                            <h3 style={{fontSize: '1.4rem', marginBottom: '0.75rem'}}>Destinos {year}</h3>
+                            <div className="wrapped-places-grid">
+                                {uniquePlaces.map((place, i) => <div key={i} className="wrapped-place-tag">{place}</div>)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const TripsListView = ({ trips, onTripClick, onEditTrip }) => {
+            if (trips.length === 0) return <div className="empty-state"><div className="empty-state-icon">✈️</div><div className="empty-state-text">No hay viajes registrados aún</div></div>;
+            const sortedTrips = [...trips].sort((a, b) => new Date(b.fechaInicio) - new Date(a.fechaInicio));
+
+            return (
+                <div>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
+                        <h2 style={{fontSize: '2rem', color: 'var(--secondary)'}}>Todos los Viajes</h2>
+                    </div>
+                    <div className="trips-list">
+                        {sortedTrips.map(trip => (
+                            <TripCard key={trip.id} trip={trip} onClick={() => onTripClick(trip)} showEditButton={true} onEdit={onEditTrip} />
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('profile');
+            const [trips, setTrips] = useState([]);
+            const [profile, setProfile] = useState(null);
+            const [homeCoords, setHomeCoords] = useState(null);
+            const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+            const [selectedTrip, setSelectedTrip] = useState(null);
+            const [editingTrip, setEditingTrip] = useState(null);
+
+            useEffect(() => {
+                const savedTrips = localStorage.getItem('nomadAtlasTrips');
+                const savedProfile = localStorage.getItem('nomadAtlasProfile');
+                if (savedTrips) {
+                    try { setTrips(JSON.parse(savedTrips)); }
+                    catch (e) { console.error('Error loading trips:', e); }
+                }
+                if (savedProfile) {
+                    try {
+                        const prof = JSON.parse(savedProfile);
+                        setProfile(prof);
+                        if (prof.ubicacion) {
+                            geocodePlace(prof.ubicacion).then(coords => {
+                                if (coords) setHomeCoords(coords);
+                            });
+                        }
+                        setActiveTab('map');
+                    }
+                    catch (e) { console.error('Error loading profile:', e); }
+                }
+            }, []);
+
+            useEffect(() => { localStorage.setItem('nomadAtlasTrips', JSON.stringify(trips)); }, [trips]);
+            useEffect(() => {
+                if (profile) {
+                    localStorage.setItem('nomadAtlasProfile', JSON.stringify(profile));
+                    if (profile.ubicacion && !homeCoords) {
+                        geocodePlace(profile.ubicacion).then(coords => {
+                            if (coords) setHomeCoords(coords);
+                        });
+                    }
+                }
+            }, [profile]);
+
+            const handleAddTrip = (trip) => {
+                if (editingTrip) {
+                    setTrips(trips.map(t => t.id === trip.id ? trip : t));
+                    setEditingTrip(null);
+                } else {
+                    setTrips([trip, ...trips]);
+                }
+                setActiveTab('trips');
+            };
+
+            const handleUpdateProfile = (newProfile) => {
+                setProfile(newProfile);
+                if (newProfile.ubicacion) {
+                    geocodePlace(newProfile.ubicacion).then(coords => {
+                        if (coords) setHomeCoords(coords);
+                    });
+                }
+                setActiveTab('map');
+            };
+
+            const handleEditTrip = (trip) => { setEditingTrip(trip); setActiveTab('add'); };
+
+            const allPeople = [...new Map(trips.flatMap(t => t.personas).map(p => [p.nombre, p])).values()];
+            const allDestinations = [...new Map(trips.flatMap(t => t.destinos).map(d => [d.lugar, { lugar: d.lugar, coordinates: d.coordinates }])).values()];
+            const availableYears = [...new Set(trips.map(t => new Date(t.fechaInicio).getFullYear()))].sort((a, b) => b - a);
+
+            return (
+                <div className="app-container">
+                    <header className="header">
+                        <div className="header-content">
+                            <h1 className="logo">Nomad Atlas</h1>
+                            <nav className="nav-tabs">
+                                <button className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>👤 Perfil</button>
+                                <button className={`nav-tab ${activeTab === 'map' ? 'active' : ''}`} onClick={() => setActiveTab('map')} disabled={!profile}>🗺️ Mapa</button>
+                                <button className={`nav-tab ${activeTab === 'trips' ? 'active' : ''}`} onClick={() => setActiveTab('trips')} disabled={!profile}>✈️ Viajes</button>
+                                <button className={`nav-tab ${activeTab === 'add' ? 'active' : ''}`} onClick={() => { setEditingTrip(null); setActiveTab('add'); }} disabled={!profile}>➕ Agregar</button>
+                                <button className={`nav-tab ${activeTab === 'timeline' ? 'active' : ''}`} onClick={() => setActiveTab('timeline')} disabled={!profile}>📅 Timeline</button>
+                                <button className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')} disabled={!profile}>📊 Dashboard</button>
+                                <button className={`nav-tab ${activeTab === 'wrapped' ? 'active' : ''}`} onClick={() => setActiveTab('wrapped')} disabled={!profile}>🎁 Wrapped</button>
+                            </nav>
+                        </div>
+                    </header>
+
+                    <main className="main-content">
+                        {activeTab === 'profile' && <ProfileView profile={profile} onUpdateProfile={handleUpdateProfile} />}
+
+                        {activeTab === 'map' && profile && (
+                            <>
+                                <div className="map-container"><MapView trips={trips} homeCoords={homeCoords} onTripClick={setSelectedTrip} /></div>
+                                <h2 style={{fontSize: '1.8rem', margin: '2rem 0 1.5rem', color: 'var(--secondary)'}}>Tus Viajes</h2>
+                                <div className="trips-list">
+                                    {trips.length > 0 ? trips.slice(0, 6).map(trip => <TripCard key={trip.id} trip={trip} onClick={() => setSelectedTrip(trip)} showEditButton={false} />) : <div className="empty-state"><div className="empty-state-icon">✈️</div><div className="empty-state-text">¡Comienza tu aventura! Agrega tu primer viaje</div></div>}
+                                </div>
+                            </>
+                        )}
+
+                        {activeTab === 'trips' && profile && <TripsListView trips={trips} onTripClick={setSelectedTrip} onEditTrip={handleEditTrip} />}
+
+                        {activeTab === 'add' && profile && <AddTripForm onAddTrip={handleAddTrip} allPeople={allPeople} allDestinations={allDestinations} editingTrip={editingTrip} onCancelEdit={() => { setEditingTrip(null); setActiveTab('trips'); }} />}
+
+                        {activeTab === 'timeline' && profile && <TimelineView trips={trips} onTripClick={setSelectedTrip} />}
+
+                        {activeTab === 'dashboard' && profile && <DashboardView trips={trips} homeCoords={homeCoords} />}
+
+                        {activeTab === 'wrapped' && profile && (
+                            <>
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} style={{ padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid var(--border)', background: 'white' }}>
+                                        {availableYears.length > 0 ? availableYears.map(year => <option key={year} value={year}>{year}</option>) : <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>}
+                                    </select>
+                                </div>
+                                <WrappedView trips={trips} year={selectedYear} />
+                            </>
+                        )}
+                    </main>
+
+                    {selectedTrip && <TripDetailModal trip={selectedTrip} onClose={() => setSelectedTrip(null)} homeCoords={homeCoords} />}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
