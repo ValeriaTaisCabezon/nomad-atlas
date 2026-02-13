@@ -15,8 +15,19 @@ A travel diary single-page application built with React 18 and Leaflet maps.
 - Babel standalone for JSX transformation
 - No build step required - pure static HTML
 
+## Project Structure
+```
+index.html          → HTML structure + script loader
+css/styles.css      → All styling
+js/app.js           → All React components and logic
+```
+
 ## Development
-Edit `index.html` directly. Open in any browser to preview.
+Start a local server in the project folder:
+```bash
+npx serve
+```
+Then open http://localhost:3000. Edit files and refresh to see changes.
 
 ## Deployment
 Auto-deployed to Vercel on every push to `main`.
