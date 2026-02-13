@@ -181,6 +181,22 @@
         .csv-progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 1rem 0; }
         .csv-progress-fill { height: 100%; background: var(--secondary); border-radius: 4px; transition: width 0.3s; }
 
+        .year-selector-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem; padding: 1rem 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border: 2px solid var(--border); flex-wrap: wrap; }
+        .year-chip { padding: 0.5rem 1.25rem; border-radius: 20px; border: 2px solid var(--border); background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.3s; color: var(--dark); }
+        .year-chip:hover { border-color: var(--primary); background: var(--light); }
+        .year-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .dashboard-bar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .dashboard-bar-label { min-width: 80px; font-size: 0.85rem; font-weight: 600; color: var(--secondary); text-align: right; }
+        .dashboard-bar-track { flex: 1; height: 24px; background: var(--light); border-radius: 12px; overflow: hidden; }
+        .dashboard-bar-fill { height: 100%; background: linear-gradient(135deg, var(--primary) 0%, #c89456 100%); border-radius: 12px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 0.5rem; min-width: 24px; }
+        .dashboard-bar-value { font-size: 0.75rem; font-weight: 700; color: white; }
+        .dashboard-bar-count { min-width: 30px; font-size: 0.85rem; font-weight: 700; color: var(--secondary); text-align: left; }
+        .dashboard-mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+        .dashboard-mini-card { background: var(--light); padding: 1.25rem; border-radius: 12px; text-align: center; }
+        .dashboard-mini-value { font-size: 2rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
+        .dashboard-mini-label { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
+
         @media (max-width: 768px) {
             .header-content { flex-direction: column; text-align: center; }
             .form-grid { grid-template-columns: 1fr; }
@@ -225,6 +241,41 @@
         const getMotivoEmoji = (motivo) => {
             const emojis = { 'placer': '🏖️', 'negocios': '💼', 'evento': '🎉', 'familia': '👨‍👩‍👧‍👦', 'estudio': '📚', 'otro': '🌟' };
             return emojis[motivo] || '✈️';
+        };
+
+        const compressImage = (dataUrl, maxWidth = 800, quality = 0.6) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => resolve(dataUrl);
+                img.src = dataUrl;
+            });
+        };
+
+        const formatDateRange = (startDate, endDate) => {
+            if (!startDate) return '';
+            const opts = { day: 'numeric', month: 'short' };
+            const optsYear = { day: 'numeric', month: 'short', year: 'numeric' };
+            const s = new Date(startDate + 'T12:00:00');
+            if (!endDate || endDate === startDate) return s.toLocaleDateString('es-ES', optsYear);
+            const e = new Date(endDate + 'T12:00:00');
+            if (s.getFullYear() === e.getFullYear()) {
+                return s.toLocaleDateString('es-ES', opts) + ' - ' + e.toLocaleDateString('es-ES', optsYear);
+            }
+            return s.toLocaleDateString('es-ES', optsYear) + ' - ' + e.toLocaleDateString('es-ES', optsYear);
+        };
+
+        const safeSetItem = (key, value, showToast) => {
+            try { localStorage.setItem(key, value); }
+            catch (e) { if (showToast) showToast('Almacenamiento lleno. Intenta eliminar fotos de algunos viajes.', 'error'); console.error('localStorage quota exceeded:', e); }
         };
 
         const ToastContainer = ({ toasts }) => (
@@ -414,7 +465,7 @@
                         {firstDestino?.foto && <img src={firstDestino.foto} alt={firstDestino.lugar} className="trip-list-card-image" />}
                         <div className="trip-list-card-content">
                             <h3 className="trip-list-card-title">{trip.destinos.map(d => d.lugar).join(' → ')}</h3>
-                            <div className="trip-list-card-date">{new Date(trip.fechaInicio).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                            <div className="trip-list-card-date">{formatDateRange(trip.fechaInicio, trip.fechaFinal)}</div>
                             <div className="trip-list-card-meta">
                                 <div className="trip-list-card-meta-item"><span>{getMotivoEmoji(trip.motivo)}</span><span>{trip.motivo}</span></div>
                                 <div className="trip-list-card-meta-item"><span>⏱️</span><span>{duracion}d</span></div>
@@ -527,7 +578,7 @@
                         <div className="modal-body">
                             <h2 className="trip-detail-title">{trip.destinos.map(d => d.lugar).join(' → ')}</h2>
                             <div className="trip-detail-meta">
-                                <div className="trip-detail-meta-item"><span>📅</span><span>{new Date(trip.fechaInicio).toLocaleDateString('es-ES')}{trip.fechaFinal && ` - ${new Date(trip.fechaFinal).toLocaleDateString('es-ES')}`}</span></div>
+                                <div className="trip-detail-meta-item"><span>📅</span><span>{formatDateRange(trip.fechaInicio, trip.fechaFinal)}</span></div>
                                 <div className="trip-detail-meta-item"><span>{getMotivoEmoji(trip.motivo)}</span><span>{trip.motivo}</span></div>
                                 <div className="trip-detail-meta-item"><span>⏱️</span><span>{duracion} día{duracion !== 1 ? 's' : ''}</span></div>
                                 <div className="trip-detail-meta-item"><span>📍</span><span>{trip.destinos.length} destino{trip.destinos.length !== 1 ? 's' : ''}</span></div>
@@ -553,7 +604,7 @@
                                         {destino.foto && <img src={destino.foto} alt={destino.lugar} style={{width: '100%', height: '150px', objectFit: 'cover'}} />}
                                         <div style={{padding: '1rem'}}>
                                             <div style={{fontSize: '1.1rem', fontWeight: '700', color: 'var(--secondary)', marginBottom: '0.5rem'}}>{destino.lugar}</div>
-                                            {destino.fechaInicio && <div style={{fontSize: '0.85rem', color: '#666'}}>{new Date(destino.fechaInicio).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}{destino.fechaFinal && ` - ${new Date(destino.fechaFinal).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}`}</div>}
+                                            {destino.fechaInicio && <div style={{fontSize: '0.85rem', color: '#666'}}>{formatDateRange(destino.fechaInicio, destino.fechaFinal)}</div>}
                                         </div>
                                     </div>
                                 ))}
@@ -574,48 +625,86 @@
             );
         };
 
-        const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips }) => {
-            const [formData, setFormData] = useState(editingTrip || { fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
-            const [currentDestino, setCurrentDestino] = useState({ lugar: '', fechaInicio: '', fechaFinal: '', foto: null });
-            const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
-            const [previewUrl, setPreviewUrl] = useState(null);
-            const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
-            const [isGeocoding, setIsGeocoding] = useState(false);
-            const [editingDestinoIndex, setEditingDestinoIndex] = useState(null);
-            // CSV import is now handled by CSVImportPanel component
+        const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, setIsGeocoding }) => {
+            const [isEditing, setIsEditing] = useState(!!destino._isNew);
+            const [local, setLocal] = useState({ ...destino });
+            const [localPreview, setLocalPreview] = useState(destino.foto);
+            const fileInputId = 'destino-photo-' + index;
 
-            useEffect(() => { if (editingTrip) setFormData(editingTrip); }, [editingTrip]);
-
-            const handleAddOrUpdateDestino = async () => {
-                if (!currentDestino.lugar) return;
-                setIsGeocoding(true);
-                const coordinates = currentDestino.coordinates || await geocodePlace(currentDestino.lugar);
-                const updatedDestino = { ...currentDestino, coordinates };
-                
-                if (editingDestinoIndex !== null) {
-                    const newDestinos = [...formData.destinos];
-                    newDestinos[editingDestinoIndex] = updatedDestino;
-                    setFormData({ ...formData, destinos: newDestinos });
-                    setEditingDestinoIndex(null);
-                } else {
-                    setFormData({ ...formData, destinos: [...formData.destinos, updatedDestino] });
+            const handleLocalFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {
+                        const compressed = await compressImage(reader.result, 800, 0.6);
+                        setLocal(prev => ({ ...prev, foto: compressed }));
+                        setLocalPreview(compressed);
+                    };
+                    reader.readAsDataURL(file);
                 }
-                setCurrentDestino({ lugar: '', fechaInicio: '', fechaFinal: '', foto: null });
-                setPreviewUrl(null);
+            };
+
+            const handleSave = async () => {
+                if (!local.lugar) return;
+                setIsGeocoding(true);
+                const coordinates = local.coordinates || await geocodePlace(local.lugar);
+                const { _isNew, ...rest } = local;
+                onSave(index, { ...rest, coordinates });
+                setIsEditing(false);
                 setIsGeocoding(false);
             };
 
-            const handleEditDestino = (index) => {
-                setCurrentDestino(formData.destinos[index]);
-                setPreviewUrl(formData.destinos[index].foto);
-                setEditingDestinoIndex(index);
+            const handleCancel = () => {
+                if (destino._isNew) { onRemove(index); return; }
+                setLocal({ ...destino });
+                setLocalPreview(destino.foto);
+                setIsEditing(false);
             };
 
-            const handleRemoveDestino = (index) => setFormData({ ...formData, destinos: formData.destinos.filter((_, i) => i !== index) });
+            if (isEditing) {
+                return (
+                    <div className="destination-item" style={{borderColor: 'var(--primary)'}}>
+                        <div className="form-grid">
+                            <div className="form-group"><label>Lugar *</label><input type="text" value={local.lugar} onChange={(e) => setLocal({...local, lugar: e.target.value})} placeholder="París, Francia" /></div>
+                            <div className="form-group"><label>Fecha inicio</label><input type="date" value={local.fechaInicio || ''} onChange={(e) => setLocal({...local, fechaInicio: e.target.value})} min={formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
+                            <div className="form-group"><label>Fecha final</label><input type="date" value={local.fechaFinal || ''} onChange={(e) => setLocal({...local, fechaFinal: e.target.value})} min={local.fechaInicio || formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
+                            <div className="form-group">
+                                <label>Foto</label>
+                                <div className="file-input-wrapper">
+                                    <input type="file" id={fileInputId} accept="image/*" onChange={handleLocalFileChange} />
+                                    <label htmlFor={fileInputId} className="file-input-label">📸 {local.foto ? 'Cambiar foto' : 'Seleccionar foto'}</label>
+                                </div>
+                                {localPreview && <img src={localPreview} alt="Preview" className="image-preview" />}
+                            </div>
+                        </div>
+                        <div style={{display: 'flex', gap: '0.5rem', marginTop: '1rem'}}>
+                            <button type="button" className="btn-secondary" onClick={handleSave} disabled={!local.lugar || isGeocoding}>
+                                {isGeocoding ? <span className="loading"></span> : '💾 Guardar'}
+                            </button>
+                            <button type="button" className="btn-edit" onClick={handleCancel}>Cancelar</button>
+                        </div>
+                    </div>
+                );
+            }
 
-            const handleSelectSavedDestination = (savedDest) => {
-                setCurrentDestino({ lugar: savedDest.lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: savedDest.coordinates });
-            };
+            return (
+                <div className="destination-item">
+                    <button type="button" className="btn-remove" onClick={() => onRemove(index)}>×</button>
+                    <h4>📍 {destino.lugar}</h4>
+                    {(destino.fechaInicio || destino.fechaFinal) && <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem'}}>{formatDateRange(destino.fechaInicio, destino.fechaFinal)}</p>}
+                    {destino.foto && <img src={destino.foto} alt={destino.lugar} className="image-preview" />}
+                    <button type="button" className="btn-edit-destino" onClick={() => setIsEditing(true)}>✏️ Editar</button>
+                </div>
+            );
+        };
+
+        const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips }) => {
+            const [formData, setFormData] = useState(editingTrip || { fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+            const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
+            const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
+            const [isGeocoding, setIsGeocoding] = useState(false);
+
+            useEffect(() => { if (editingTrip) setFormData(editingTrip); }, [editingTrip]);
 
             const handleAddPerson = (personData) => {
                 const nombre = typeof personData === 'string' ? personData : personData.nombre;
@@ -628,20 +717,15 @@
 
             const handleRemovePerson = (nombre) => setFormData({ ...formData, personas: formData.personas.filter(p => p.nombre !== nombre) });
 
-            const handleFileChange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => { setCurrentDestino({ ...currentDestino, foto: reader.result }); setPreviewUrl(reader.result); };
-                    reader.readAsDataURL(file);
-                }
-            };
-
             const handlePersonPhotoChange = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => { setCurrentPerson({ ...currentPerson, foto: reader.result }); setPersonPreviewUrl(reader.result); };
+                    reader.onloadend = async () => {
+                        const compressed = await compressImage(reader.result, 200, 0.7);
+                        setCurrentPerson(prev => ({ ...prev, foto: compressed }));
+                        setPersonPreviewUrl(compressed);
+                    };
                     reader.readAsDataURL(file);
                 }
             };
@@ -698,48 +782,37 @@
 
                         <div className="form-section">
                             <h3 className="form-section-title">Destinos</h3>
-                            
+
                             {savedDestinations.length > 0 && (
                                 <div style={{marginBottom: '1rem'}}>
                                     <label>Seleccionar destino guardado:</label>
                                     <div className="suggested-people">
                                         {savedDestinations.slice(0, 10).map(dest => (
-                                            <div key={dest.lugar} className="suggested-person" onClick={() => handleSelectSavedDestination(dest)}>📍 {dest.lugar}</div>
+                                            <div key={dest.lugar} className="suggested-person" onClick={() => {
+                                                const newDest = { lugar: dest.lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: dest.coordinates };
+                                                setFormData(prev => ({ ...prev, destinos: [...prev.destinos, newDest] }));
+                                            }}>📍 {dest.lugar}</div>
                                         ))}
                                     </div>
                                 </div>
                             )}
-                            
-                            <div className="form-grid">
-                                <div className="form-group"><label>Lugar</label><input type="text" value={currentDestino.lugar} onChange={(e) => setCurrentDestino({...currentDestino, lugar: e.target.value})} placeholder="París, Francia" /></div>
-                                <div className="form-group"><label>Fecha inicio en destino</label><input type="date" value={currentDestino.fechaInicio} onChange={(e) => setCurrentDestino({...currentDestino, fechaInicio: e.target.value})} min={formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
-                                <div className="form-group"><label>Fecha final en destino</label><input type="date" value={currentDestino.fechaFinal} onChange={(e) => setCurrentDestino({...currentDestino, fechaFinal: e.target.value})} min={currentDestino.fechaInicio || formData.fechaInicio} max={formData.fechaFinal || undefined} /></div>
-                                <div className="form-group">
-                                    <label>Foto del destino</label>
-                                    <div className="file-input-wrapper">
-                                        <input type="file" id="destino-photo" accept="image/*" onChange={handleFileChange} />
-                                        <label htmlFor="destino-photo" className="file-input-label">📸 {currentDestino.foto ? 'Cambiar foto' : 'Seleccionar foto'}</label>
-                                    </div>
-                                    {previewUrl && <img src={previewUrl} alt="Preview" className="image-preview" />}
-                                </div>
-                            </div>
-                            <button type="button" className="btn-secondary" onClick={handleAddOrUpdateDestino} disabled={!currentDestino.lugar || isGeocoding} style={{marginTop: '1rem'}}>
-                                {isGeocoding ? <span className="loading"></span> : (editingDestinoIndex !== null ? '💾 Actualizar Destino' : '+ Agregar Destino')}
-                            </button>
 
-                            {formData.destinos.length > 0 && (
-                                <div className="destinations-list">
-                                    {formData.destinos.map((destino, index) => (
-                                        <div key={index} className="destination-item">
-                                            <button type="button" className="btn-remove" onClick={() => handleRemoveDestino(index)}>×</button>
-                                            <h4>📍 {destino.lugar}</h4>
-                                            {(destino.fechaInicio || destino.fechaFinal) && <p style={{fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem'}}>{destino.fechaInicio && new Date(destino.fechaInicio).toLocaleDateString('es-ES')}{destino.fechaFinal && ` - ${new Date(destino.fechaFinal).toLocaleDateString('es-ES')}`}</p>}
-                                            {destino.foto && <img src={destino.foto} alt={destino.lugar} className="image-preview" />}
-                                            <button type="button" className="btn-edit-destino" onClick={() => handleEditDestino(index)}>✏️ Editar Destino</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="destinations-list">
+                                {formData.destinos.map((destino, index) => (
+                                    <DestinoCard key={index} destino={destino} index={index} formData={formData}
+                                        onSave={(idx, updated) => { const nd = [...formData.destinos]; nd[idx] = updated; setFormData({...formData, destinos: nd}); }}
+                                        onRemove={(idx) => setFormData({...formData, destinos: formData.destinos.filter((_, i) => i !== idx)})}
+                                        isGeocoding={isGeocoding} setIsGeocoding={setIsGeocoding}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="destination-item" style={{border: '2px dashed var(--border)', cursor: 'pointer', textAlign: 'center', padding: '1.5rem'}}
+                                onClick={() => {
+                                    setFormData(prev => ({...prev, destinos: [...prev.destinos, { lugar: '', fechaInicio: '', fechaFinal: '', foto: null, coordinates: null, _isNew: true }]}));
+                                }}>
+                                <span style={{fontSize: '1.1rem', color: 'var(--secondary)', fontWeight: '600'}}>➕ Agregar Destino</span>
+                            </div>
                         </div>
 
                         <div className="form-section">
@@ -1018,133 +1091,179 @@
         const DashboardView = ({ trips, homeCoords }) => {
             if (trips.length === 0) return <div className="empty-state"><div className="empty-state-icon">📊</div><div className="empty-state-text">Agrega viajes para ver tus métricas</div></div>;
 
+            // --- Section 1: Overview ---
             const totalTrips = trips.length;
-            const allDestinations = trips.flatMap(t => t.destinos);
-            const uniquePlaces = new Set(allDestinations.map(d => d.lugar)).size;
-            
+            const allDest = trips.flatMap(t => t.destinos);
+            const uniquePlaces = new Set(allDest.map(d => d.lugar)).size;
+            const totalDays = trips.reduce((sum, t) => sum + Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1), 0);
+            const avgTripLength = Math.round(totalDays / totalTrips);
+            const longestTrip = trips.reduce((best, t) => { const d = Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1); return d > best.days ? { name: t.destinos.map(dd => dd.lugar).join(', '), days: d } : best; }, { name: '', days: 0 });
             let totalKm = 0;
             if (homeCoords) {
                 trips.forEach(trip => {
-                    let lastCoords = homeCoords;
-                    trip.destinos.forEach(destino => {
-                        if (destino.coordinates) {
-                            totalKm += calculateDistance(lastCoords.lat, lastCoords.lng, destino.coordinates.lat, destino.coordinates.lng);
-                            lastCoords = destino.coordinates;
-                        }
-                    });
-                    totalKm += calculateDistance(lastCoords.lat, lastCoords.lng, homeCoords.lat, homeCoords.lng);
+                    let last = homeCoords;
+                    trip.destinos.forEach(d => { if (d.coordinates) { totalKm += calculateDistance(last.lat, last.lng, d.coordinates.lat, d.coordinates.lng); last = d.coordinates; } });
+                    totalKm += calculateDistance(last.lat, last.lng, homeCoords.lat, homeCoords.lng);
                 });
             }
-            
+
+            // --- Section 2: Travel Patterns ---
+            const monthCounts = Array(12).fill(0);
+            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            trips.forEach(t => { monthCounts[new Date(t.fechaInicio).getMonth()]++; });
+            const maxMonth = Math.max(...monthCounts);
+            const busiestMonthIdx = monthCounts.indexOf(maxMonth);
+
+            // Southern hemisphere seasons (Argentina)
+            const seasonMap = [0,0,1,1,1,2,2,2,3,3,3,0]; // Dec-Feb=Verano(0), Mar-May=Otoño(1), Jun-Aug=Invierno(2), Sep-Nov=Primavera(3)
+            const seasonNames = ['☀️ Verano', '🍂 Otoño', '❄️ Invierno', '🌸 Primavera'];
+            const seasonCounts = [0, 0, 0, 0];
+            trips.forEach(t => { seasonCounts[seasonMap[new Date(t.fechaInicio).getMonth()]]++; });
+
+            // Travel streaks (consecutive months with trips)
+            const monthsWithTrips = new Set();
+            trips.forEach(t => { const d = new Date(t.fechaInicio); monthsWithTrips.add(d.getFullYear() * 12 + d.getMonth()); });
+            const sortedMonths = [...monthsWithTrips].sort((a, b) => a - b);
+            let maxStreak = 0, streak = 1;
+            for (let i = 1; i < sortedMonths.length; i++) {
+                if (sortedMonths[i] === sortedMonths[i - 1] + 1) { streak++; maxStreak = Math.max(maxStreak, streak); }
+                else { streak = 1; }
+            }
+            maxStreak = Math.max(maxStreak, streak);
+            if (sortedMonths.length === 0) maxStreak = 0;
+
+            // --- Section 3: Geography ---
             const placeCount = {};
-            allDestinations.forEach(d => { placeCount[d.lugar] = (placeCount[d.lugar] || 0) + 1; });
-            const topDestinations = Object.entries(placeCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-            const totalDays = trips.reduce((sum, t) => sum + (t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1), 0);
+            allDest.forEach(d => { placeCount[d.lugar] = (placeCount[d.lugar] || 0) + 1; });
+            const placeEntries = Object.entries(placeCount).sort((a, b) => b[1] - a[1]);
+            const mostVisited = placeEntries[0];
+            const newPlaces = placeEntries.filter(([_, c]) => c === 1).length;
+            const revisitedPlaces = placeEntries.filter(([_, c]) => c > 1).length;
+            const avgDestsPerTrip = (allDest.length / totalTrips).toFixed(1);
+
+            let furthest = { name: '-', km: 0 };
+            if (homeCoords) {
+                allDest.forEach(d => {
+                    if (d.coordinates) {
+                        const km = calculateDistance(homeCoords.lat, homeCoords.lng, d.coordinates.lat, d.coordinates.lng);
+                        if (km > furthest.km) furthest = { name: d.lugar, km };
+                    }
+                });
+            }
+
+            // --- Section 4: Social ---
+            const soloTrips = trips.filter(t => !t.personas || t.personas.length === 0).length;
+            const groupTrips = totalTrips - soloTrips;
             const motivoCount = {};
             trips.forEach(t => { motivoCount[t.motivo] = (motivoCount[t.motivo] || 0) + 1; });
-            const favoriteMotivo = Object.entries(motivoCount).sort((a, b) => b[1] - a[1])[0];
+            const motivoEntries = Object.entries(motivoCount).sort((a, b) => b[1] - a[1]);
+            const maxMotivo = motivoEntries.length > 0 ? motivoEntries[0][1] : 1;
 
             const peopleStats = {};
             trips.forEach(trip => {
-                const duracion = trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / (1000 * 60 * 60 * 24)) : 1;
-                trip.personas.forEach(person => {
-                    if (!peopleStats[person.nombre]) peopleStats[person.nombre] = { trips: 0, days: 0, places: new Set(), foto: person.foto };
-                    peopleStats[person.nombre].trips += 1;
-                    peopleStats[person.nombre].days += duracion;
-                    trip.destinos.forEach(d => peopleStats[person.nombre].places.add(d.lugar));
+                trip.personas.forEach(p => {
+                    if (!peopleStats[p.nombre]) peopleStats[p.nombre] = { count: 0, foto: p.foto };
+                    peopleStats[p.nombre].count++;
+                    if (p.foto && !peopleStats[p.nombre].foto) peopleStats[p.nombre].foto = p.foto;
                 });
             });
-            const peopleArray = Object.entries(peopleStats).map(([name, stats]) => ({ name, trips: stats.trips, days: stats.days, places: stats.places.size, foto: stats.foto })).sort((a, b) => b.trips - a.trips);
+            const topCompanion = Object.entries(peopleStats).sort((a, b) => b[1].count - a[1].count)[0];
+            const groupSizes = trips.filter(t => t.personas.length > 0).map(t => t.personas.length + 1);
+            const avgGroupSize = groupSizes.length > 0 ? (groupSizes.reduce((a, b) => a + b, 0) / groupSizes.length).toFixed(1) : '-';
 
             return (
                 <div>
+                    {/* Section 1: Overview Cards */}
                     <div className="dashboard-section">
                         <h2 className="dashboard-section-title">📊 Resumen General</h2>
                         <div className="dashboard-grid">
-                            <div className="metric-card">
-                                <div className="metric-icon">✈️</div>
-                                <div className="metric-value">{totalTrips}</div>
-                                <div className="metric-label">Viajes Totales</div>
-                                <div className="metric-detail">{totalDays} días viajando</div>
-                            </div>
-                            <div className="metric-card">
-                                <div className="metric-icon">🗺️</div>
-                                <div className="metric-value">{uniquePlaces}</div>
-                                <div className="metric-label">Lugares Únicos</div>
-                            </div>
-                            <div className="metric-card">
-                                <div className="metric-icon">🌍</div>
-                                <div className="metric-value">{Math.round(totalKm).toLocaleString()}</div>
-                                <div className="metric-label">Kilómetros</div>
-                                <div className="metric-detail">{(totalKm / 40075).toFixed(2)}x la vuelta al mundo</div>
-                            </div>
-                            {favoriteMotivo && (
-                                <div className="metric-card">
-                                    <div className="metric-icon">{getMotivoEmoji(favoriteMotivo[0])}</div>
-                                    <div className="metric-value">{favoriteMotivo[1]}</div>
-                                    <div className="metric-label">Motivo Principal</div>
-                                    <div className="metric-detail">{favoriteMotivo[0]}</div>
-                                </div>
-                            )}
+                            <div className="metric-card"><div className="metric-icon">✈️</div><div className="metric-value">{totalTrips}</div><div className="metric-label">Viajes</div></div>
+                            <div className="metric-card"><div className="metric-icon">📅</div><div className="metric-value">{totalDays}</div><div className="metric-label">Días viajando</div></div>
+                            <div className="metric-card"><div className="metric-icon">🗺️</div><div className="metric-value">{uniquePlaces}</div><div className="metric-label">Lugares únicos</div></div>
+                            <div className="metric-card"><div className="metric-icon">🌍</div><div className="metric-value">{Math.round(totalKm).toLocaleString()}</div><div className="metric-label">Kilómetros</div><div className="metric-detail">{(totalKm / 40075).toFixed(2)}x la vuelta al mundo</div></div>
+                            <div className="metric-card"><div className="metric-icon">⏱️</div><div className="metric-value">{avgTripLength}</div><div className="metric-label">Promedio días/viaje</div></div>
+                            <div className="metric-card"><div className="metric-icon">🏆</div><div className="metric-value">{longestTrip.days}d</div><div className="metric-label">Viaje más largo</div><div className="metric-detail">{longestTrip.name}</div></div>
                         </div>
                     </div>
 
-                    {topDestinations.length > 0 && (
-                        <div className="dashboard-section">
-                            <h2 className="dashboard-section-title">🏆 Top 5 Destinos Más Visitados</h2>
-                            <div className="top-destinations-row">
-                                {topDestinations.map(([place, count]) => (
-                                    <div key={place} className="top-dest-card">
-                                        <div className="top-dest-name">{place}</div>
-                                        <div className="top-dest-count">{count}</div>
-                                        <div className="top-dest-label">Visitas</div>
+                    {/* Section 2: Travel Patterns */}
+                    <div className="dashboard-section">
+                        <h2 className="dashboard-section-title">📈 Patrones de Viaje</h2>
+                        <div style={{background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '2px solid var(--border)', marginBottom: '1.5rem'}}>
+                            <h3 style={{fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '1.25rem'}}>Frecuencia Mensual</h3>
+                            {monthNames.map((m, i) => (
+                                <div key={i} className="dashboard-bar-row">
+                                    <div className="dashboard-bar-label" style={{fontWeight: i === busiestMonthIdx ? '800' : '600', color: i === busiestMonthIdx ? 'var(--primary)' : 'var(--secondary)'}}>{m}</div>
+                                    <div className="dashboard-bar-track">
+                                        <div className="dashboard-bar-fill" style={{width: maxMonth > 0 ? Math.max(monthCounts[i] > 0 ? 8 : 0, (monthCounts[i] / maxMonth) * 100) + '%' : '0%', background: i === busiestMonthIdx ? 'linear-gradient(135deg, var(--accent) 0%, #d14060 100%)' : undefined}}>
+                                            {monthCounts[i] > 0 && <span className="dashboard-bar-value">{monthCounts[i]}</span>}
+                                        </div>
                                     </div>
-                                ))}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="dashboard-mini-grid">
+                            {seasonNames.map((s, i) => (
+                                <div key={i} className="dashboard-mini-card">
+                                    <div style={{fontSize: '1.5rem', marginBottom: '0.25rem'}}>{s}</div>
+                                    <div className="dashboard-mini-value">{seasonCounts[i]}</div>
+                                    <div className="dashboard-mini-label">viajes</div>
+                                </div>
+                            ))}
+                            <div className="dashboard-mini-card">
+                                <div style={{fontSize: '1.5rem', marginBottom: '0.25rem'}}>🔥</div>
+                                <div className="dashboard-mini-value">{maxStreak}</div>
+                                <div className="dashboard-mini-label">Racha (meses consecutivos)</div>
                             </div>
                         </div>
-                    )}
+                    </div>
 
-                    {peopleArray.length > 0 && (
-                        <div className="dashboard-section">
-                            <h2 className="dashboard-section-title">👥 Compañeros de Viaje</h2>
-                            <div className="people-metrics">
-                                {peopleArray.map(person => (
-                                    <div key={person.name} className="person-metric-card">
-                                        <div className="person-metric-header">
-                                            {person.foto ? (
-                                                <img src={person.foto} alt={person.name} className="person-metric-avatar" />
-                                            ) : (
-                                                <div className="person-metric-avatar" style={{background: 'linear-gradient(135deg, var(--primary) 0%, #c89456 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', color: 'white'}}>
-                                                    {person.name.charAt(0)}
-                                                </div>
-                                            )}
-                                            <div className="person-metric-info">
-                                                <div className="person-metric-name">{person.name}</div>
-                                                <div className="person-metric-main">{person.trips} viajes</div>
-                                            </div>
-                                        </div>
-                                        <div className="person-metric-stats">
-                                            <div className="person-metric-stat">
-                                                <div className="person-metric-stat-value">{person.days}</div>
-                                                <div className="person-metric-stat-label">Días juntos</div>
-                                            </div>
-                                            <div className="person-metric-stat">
-                                                <div className="person-metric-stat-value">{person.places}</div>
-                                                <div className="person-metric-stat-label">Lugares</div>
+                    {/* Section 3: Geography */}
+                    <div className="dashboard-section">
+                        <h2 className="dashboard-section-title">🌎 Geografía</h2>
+                        <div className="dashboard-grid">
+                            <div className="metric-card"><div className="metric-icon">🆕</div><div className="metric-value">{newPlaces}</div><div className="metric-label">Lugares nuevos</div></div>
+                            <div className="metric-card"><div className="metric-icon">🔄</div><div className="metric-value">{revisitedPlaces}</div><div className="metric-label">Lugares revisitados</div></div>
+                            {furthest.km > 0 && <div className="metric-card"><div className="metric-icon">📏</div><div className="metric-value">{Math.round(furthest.km).toLocaleString()} km</div><div className="metric-label">Destino más lejano</div><div className="metric-detail">{furthest.name}</div></div>}
+                            {mostVisited && <div className="metric-card"><div className="metric-icon">❤️</div><div className="metric-value">{mostVisited[1]}</div><div className="metric-label">Lugar más visitado</div><div className="metric-detail">{mostVisited[0]}</div></div>}
+                            <div className="metric-card"><div className="metric-icon">📍</div><div className="metric-value">{avgDestsPerTrip}</div><div className="metric-label">Destinos por viaje (prom.)</div></div>
+                        </div>
+                    </div>
+
+                    {/* Section 4: Social */}
+                    <div className="dashboard-section">
+                        <h2 className="dashboard-section-title">👥 Social</h2>
+                        <div className="dashboard-grid">
+                            <div className="metric-card"><div className="metric-icon">🧍</div><div className="metric-value">{soloTrips}</div><div className="metric-label">Viajes solo/a</div></div>
+                            <div className="metric-card"><div className="metric-icon">👫</div><div className="metric-value">{groupTrips}</div><div className="metric-label">Viajes en grupo</div></div>
+                            {topCompanion && <div className="metric-card"><div className="metric-icon">🥇</div><div className="metric-value">{topCompanion[1].count}</div><div className="metric-label">Compañero/a top</div><div className="metric-detail">{topCompanion[0]}</div></div>}
+                            <div className="metric-card"><div className="metric-icon">👥</div><div className="metric-value">{avgGroupSize}</div><div className="metric-label">Tamaño grupo (prom.)</div></div>
+                        </div>
+
+                        {motivoEntries.length > 0 && (
+                            <div style={{background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '2px solid var(--border)', marginTop: '1.5rem'}}>
+                                <h3 style={{fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '1.25rem'}}>Viajes por Motivo</h3>
+                                {motivoEntries.map(([motivo, count]) => (
+                                    <div key={motivo} className="dashboard-bar-row">
+                                        <div className="dashboard-bar-label">{getMotivoEmoji(motivo)} {motivo}</div>
+                                        <div className="dashboard-bar-track">
+                                            <div className="dashboard-bar-fill" style={{width: Math.max(8, (count / maxMotivo) * 100) + '%'}}>
+                                                <span className="dashboard-bar-value">{count}</span>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             );
         };
 
-        const WrappedView = ({ trips, year }) => {
-            const yearTrips = trips.filter(t => new Date(t.fechaInicio).getFullYear() === year);
-            if (yearTrips.length === 0) return <div className="empty-state"><div className="empty-state-icon">🎁</div><div className="empty-state-text">No hay viajes en {year}</div></div>;
+        const WrappedView = ({ trips, selectedYear }) => {
+            const yearTrips = trips;
+            const label = selectedYear === 'all' ? 'todos los años' : selectedYear;
+            if (yearTrips.length === 0) return <div className="empty-state"><div className="empty-state-icon">🎁</div><div className="empty-state-text">No hay viajes en {label}</div></div>;
 
             const allDestinations = yearTrips.flatMap(t => t.destinos);
             const uniquePlaces = [...new Set(allDestinations.map(d => d.lugar))];
@@ -1196,7 +1315,7 @@
                         )}
                         <div className="wrapped-card wrapped-places-card">
                             <div className="wrapped-card-icon">🏆</div>
-                            <h3 style={{fontSize: '1.4rem', marginBottom: '0.75rem'}}>Destinos {year}</h3>
+                            <h3 style={{fontSize: '1.4rem', marginBottom: '0.75rem'}}>Destinos {label}</h3>
                             <div className="wrapped-places-grid">
                                 {uniquePlaces.map((place, i) => <div key={i} className="wrapped-place-tag">{place}</div>)}
                             </div>
@@ -1225,11 +1344,12 @@
         };
 
         const App = () => {
-            const [activeTab, setActiveTab] = useState('profile');
+            const [activeTab, setActiveTab] = useState('settings');
             const [trips, setTrips] = useState([]);
             const [profile, setProfile] = useState(null);
             const [homeCoords, setHomeCoords] = useState(null);
-            const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+            const [selectedYear, setSelectedYear] = useState('all');
+            const [showAddForm, setShowAddForm] = useState(false);
             const [selectedTrip, setSelectedTrip] = useState(null);
             const [editingTrip, setEditingTrip] = useState(null);
             const [toasts, setToasts] = useState([]);
@@ -1269,10 +1389,10 @@
                 }
             }, []);
 
-            useEffect(() => { localStorage.setItem('nomadAtlasTrips', JSON.stringify(trips)); }, [trips]);
+            useEffect(() => { safeSetItem('nomadAtlasTrips', JSON.stringify(trips), showToast); }, [trips]);
             useEffect(() => {
                 if (profile) {
-                    localStorage.setItem('nomadAtlasProfile', JSON.stringify(profile));
+                    safeSetItem('nomadAtlasProfile', JSON.stringify(profile), showToast);
                     if (profile.ubicacion && !homeCoords) {
                         geocodePlace(profile.ubicacion).then(coords => {
                             if (coords) setHomeCoords(coords);
@@ -1288,12 +1408,12 @@
                 } else {
                     setTrips([trip, ...trips]);
                 }
-                setActiveTab('trips');
+                setShowAddForm(false);
             };
 
             const handleImportTrips = (newTrips) => {
                 setTrips(prev => [...newTrips, ...prev]);
-                localStorage.setItem('nomadAtlasLastImport', new Date().toISOString());
+                safeSetItem('nomadAtlasLastImport', new Date().toISOString());
                 setLastImportDate(new Date().toISOString());
                 setActiveTab('trips');
             };
@@ -1308,7 +1428,7 @@
                 setActiveTab('map');
             };
 
-            const handleEditTrip = (trip) => { setEditingTrip(trip); setActiveTab('add'); };
+            const handleEditTrip = (trip) => { setEditingTrip(trip); setShowAddForm(true); setActiveTab('trips'); };
 
             const handleDeleteTrip = (tripId) => {
                 showConfirm(
@@ -1372,7 +1492,7 @@
                             () => {
                                 setTrips(data.trips);
                                 if (data.profile) setProfile(data.profile);
-                                localStorage.setItem('nomadAtlasLastImport', new Date().toISOString());
+                                safeSetItem('nomadAtlasLastImport', new Date().toISOString());
                                 setLastImportDate(new Date().toISOString());
                                 showToast('Backup restaurado: ' + data.trips.length + ' viajes', 'success');
                             },
@@ -1398,7 +1518,7 @@
                         localStorage.removeItem('nomadAtlasProfile');
                         localStorage.removeItem('nomadAtlasLastImport');
                         setLastImportDate(null);
-                        setActiveTab('profile');
+                        setActiveTab('settings');
                         showToast('Todos los datos han sido eliminados', 'warning');
                     },
                     true
@@ -1408,6 +1528,7 @@
             const allPeople = [...new Map(trips.flatMap(t => t.personas).map(p => [p.nombre, p])).values()];
             const allDestinations = [...new Map(trips.flatMap(t => t.destinos).map(d => [d.lugar, { lugar: d.lugar, coordinates: d.coordinates }])).values()];
             const availableYears = [...new Set(trips.map(t => new Date(t.fechaInicio).getFullYear()))].sort((a, b) => b - a);
+            const filteredTrips = selectedYear === 'all' ? trips : trips.filter(t => new Date(t.fechaInicio).getFullYear() === parseInt(selectedYear));
 
             return (
                 <div className="app-container">
@@ -1415,19 +1536,28 @@
                         <div className="header-content">
                             <h1 className="logo">Nomad Atlas</h1>
                             <nav className="nav-tabs">
-                                <button className={`nav-tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>👤 Perfil</button>
                                 <button className={`nav-tab ${activeTab === 'map' ? 'active' : ''}`} onClick={() => setActiveTab('map')} disabled={!profile}>🗺️ Mapa</button>
-                                <button className={`nav-tab ${activeTab === 'trips' ? 'active' : ''}`} onClick={() => setActiveTab('trips')} disabled={!profile}>✈️ Viajes{trips.length > 0 ? ' (' + trips.length + ')' : ''}</button>
-                                <button className={`nav-tab ${activeTab === 'add' ? 'active' : ''}`} onClick={() => { setEditingTrip(null); setActiveTab('add'); }} disabled={!profile}>➕ Agregar</button>
+                                <button className={`nav-tab ${activeTab === 'trips' ? 'active' : ''}`} onClick={() => setActiveTab('trips')} disabled={!profile}>✈️ Viajes{filteredTrips.length > 0 ? ' (' + filteredTrips.length + ')' : ''}</button>
                                 <button className={`nav-tab ${activeTab === 'timeline' ? 'active' : ''}`} onClick={() => setActiveTab('timeline')} disabled={!profile}>📅 Timeline</button>
                                 <button className={`nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')} disabled={!profile}>📊 Dashboard</button>
                                 <button className={`nav-tab ${activeTab === 'wrapped' ? 'active' : ''}`} onClick={() => setActiveTab('wrapped')} disabled={!profile}>🎁 Wrapped</button>
+                                <button className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>⚙️ Ajustes</button>
                             </nav>
                         </div>
                     </header>
 
                     <main className="main-content">
-                        {activeTab === 'profile' && (
+                        {profile && availableYears.length > 0 && (
+                            <div className="year-selector-bar">
+                                <span style={{fontWeight: '700', color: 'var(--secondary)', fontSize: '0.9rem'}}>📅 Año:</span>
+                                <button className={`year-chip ${selectedYear === 'all' ? 'active' : ''}`} onClick={() => setSelectedYear('all')}>Todos</button>
+                                {availableYears.map(y => (
+                                    <button key={y} className={`year-chip ${selectedYear === String(y) ? 'active' : ''}`} onClick={() => setSelectedYear(String(y))}>{y}</button>
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'settings' && (
                             <>
                                 <ProfileView profile={profile} onUpdateProfile={handleUpdateProfile} />
                                 {profile && <DataManagementPanel trips={trips} lastImportDate={lastImportDate} onExportJSON={handleExportJSON} onExportCSV={handleExportCSV} onImportJSON={handleImportJSON} onClearAll={handleClearAllData} />}
@@ -1435,32 +1565,29 @@
                         )}
 
                         {activeTab === 'map' && profile && (
+                            <div className="map-container"><MapView trips={filteredTrips} homeCoords={homeCoords} onTripClick={setSelectedTrip} /></div>
+                        )}
+
+                        {activeTab === 'trips' && profile && (
                             <>
-                                <div className="map-container"><MapView trips={trips} homeCoords={homeCoords} onTripClick={setSelectedTrip} /></div>
-                                <h2 style={{fontSize: '1.8rem', margin: '2rem 0 1.5rem', color: 'var(--secondary)'}}>Tus Viajes</h2>
-                                <div className="trips-list">
-                                    {trips.length > 0 ? trips.slice(0, 6).map(trip => <TripCard key={trip.id} trip={trip} onClick={() => setSelectedTrip(trip)} showEditButton={false} />) : <div className="empty-state"><div className="empty-state-icon">✈️</div><div className="empty-state-text">¡Comienza tu aventura! Agrega tu primer viaje</div></div>}
+                                <div style={{display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}}>
+                                    <button className="btn-primary" onClick={() => { setEditingTrip(null); setShowAddForm(!showAddForm); }}>
+                                        {showAddForm ? '✕ Cerrar Formulario' : '➕ Nuevo Viaje'}
+                                    </button>
                                 </div>
+                                {(showAddForm || editingTrip) && (
+                                    <AddTripForm onAddTrip={(trip) => { handleAddTrip(trip); setShowAddForm(false); }} allPeople={allPeople} allDestinations={allDestinations} editingTrip={editingTrip} onCancelEdit={() => { setEditingTrip(null); setShowAddForm(false); }} existingTrips={trips} showToast={showToast} onImportTrips={handleImportTrips} />
+                                )}
+                                <TripsListView trips={filteredTrips} onTripClick={setSelectedTrip} onEditTrip={(trip) => { handleEditTrip(trip); setShowAddForm(true); }} onDeleteTrip={handleDeleteTrip} />
                             </>
                         )}
 
-                        {activeTab === 'trips' && profile && <TripsListView trips={trips} onTripClick={setSelectedTrip} onEditTrip={handleEditTrip} onDeleteTrip={handleDeleteTrip} />}
+                        {activeTab === 'timeline' && profile && <TimelineView trips={filteredTrips} onTripClick={setSelectedTrip} />}
 
-                        {activeTab === 'add' && profile && <AddTripForm onAddTrip={handleAddTrip} allPeople={allPeople} allDestinations={allDestinations} editingTrip={editingTrip} onCancelEdit={() => { setEditingTrip(null); setActiveTab('trips'); }} existingTrips={trips} showToast={showToast} onImportTrips={handleImportTrips} />}
-
-                        {activeTab === 'timeline' && profile && <TimelineView trips={trips} onTripClick={setSelectedTrip} />}
-
-                        {activeTab === 'dashboard' && profile && <DashboardView trips={trips} homeCoords={homeCoords} />}
+                        {activeTab === 'dashboard' && profile && <DashboardView trips={filteredTrips} homeCoords={homeCoords} />}
 
                         {activeTab === 'wrapped' && profile && (
-                            <>
-                                <div style={{ marginBottom: '1.5rem' }}>
-                                    <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} style={{ padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '2px solid var(--border)', background: 'white' }}>
-                                        {availableYears.length > 0 ? availableYears.map(year => <option key={year} value={year}>{year}</option>) : <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>}
-                                    </select>
-                                </div>
-                                <WrappedView trips={trips} year={selectedYear} />
-                            </>
+                            <WrappedView trips={filteredTrips} selectedYear={selectedYear} />
                         )}
                     </main>
 
