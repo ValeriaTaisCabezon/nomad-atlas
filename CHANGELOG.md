@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-02-13 — Dashboard bento-grid layout redesign
+
+### What changed
+
+Replaced the old uniform-card dashboard layout with a bento-grid layout matching the wireframe mockup. Uses explicit CSS grid placement (12-col x 6-row) with variable card sizes. All content fits above the fold on desktop.
+
+### Layout (wireframe-matched)
+
+```
+R1:  [TRIPS 2x2] [Days 2x1][Dist 2x1][Since 2x1] [LONGEST TRIP 4x2]
+R2:  [TRIPS    ] [--- TRAVELED MONTHS line chart 6x2 ---] [          ]
+R3:  [MOST VISITED 2x3] [--- chart cont ---] [FURTHEST DEST 4x2   ]
+R4:  [                 ] [                  ] [                     ]
+R5:  [                 ] [Freq 2x2][Avg 4x2] [TOP COMPANIONS 4x2  ]
+R6:  [Country][Continent] [       ][       ] [                     ]
+```
+
+### Card inventory (13 cards)
+
+**General (R1-2):** Trips (2x2), Total Travel Days (2x1), Total Distance (2x1), Days Since Last Trip (2x1, NEW), Longest Trip (4x2, with x% del año)
+
+**Geography (R3-6 left+center):** Traveled Months line chart (6x2), Furthest Destination (4x2, with Nx vuelta al mundo), Most Visited Destinations list (2x3, top 5), Top Country (1x1), Top Continent (1x1), Travel Frequency (2x2), Avg Trip Length (4x2)
+
+**Company (R5-6 right):** Top Companions (4x2, up to 3 people with avatars + days together)
+
+### New data computations
+- `daysSinceLast` — days between today and most recent trip end date
+- `tripsPerMonth` — travel frequency (trips / active month span)
+- `topCompanions` — top 3 companions with shared trip count and total days together
+
+### Removed from previous version
+- Streak, Revisited Places, New Destinations count, Partners count, Group Size, Motivo bar chart, Season cards, Solo/Group split
+
+### Files modified
+- `js/app.js` — Rewrote `DashboardView` component
+- `css/styles.css` — Rewrote `.bento-*` grid with explicit placement
+- `CHANGELOG.md`
+
 ## 2026-02-13 — Code structure refactor
 
 ### What changed

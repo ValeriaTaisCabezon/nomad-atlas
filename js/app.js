@@ -1,4 +1,4 @@
-const h = React.createElement;
+﻿const h = React.createElement;
 const { useState, useEffect, useRef } = React;
 
 const geocodeQueue = { lastCall: 0 };
@@ -877,15 +877,15 @@ const TimelineView = ({ trips, onTripClick }) => {
 };
 
 const DashboardView = ({ trips, homeCoords }) => {
-    if (trips.length === 0) return h('div', {className: 'empty-state'}, h('div', {className: 'empty-state-icon'}, '📊'), h('div', {className: 'empty-state-text'}, 'Agrega viajes para ver tus m\u00e9tricas'));
+    if (trips.length === 0) return h('div', {className: 'empty-state'}, h('div', {className: 'empty-state-icon'}, '📊'), h('div', {className: 'empty-state-text'}, 'Agrega viajes para ver tus métricas'));
 
-    // --- Section 1: Overview ---
+    // --- Overview ---
     const totalTrips = trips.length;
     const allDest = trips.flatMap(t => t.destinos);
-    const uniquePlaces = new Set(allDest.map(d => d.lugar)).size;
     const totalDays = trips.reduce((sum, t) => sum + Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1), 0);
     const avgTripLength = Math.round(totalDays / totalTrips);
     const longestTrip = trips.reduce((best, t) => { const d = Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1); return d > best.days ? { name: t.destinos.map(dd => dd.lugar).join(', '), days: d } : best; }, { name: '', days: 0 });
+    const longestPct = ((longestTrip.days / 365) * 100).toFixed(1);
     let totalKm = 0;
     if (homeCoords) {
         trips.forEach(trip => {
@@ -895,39 +895,29 @@ const DashboardView = ({ trips, homeCoords }) => {
         });
     }
 
-    // --- Section 2: Travel Patterns ---
+    // Days since last trip
+    const sortedByDate = [...trips].sort((a, b) => new Date(b.fechaFinal || b.fechaInicio) - new Date(a.fechaFinal || a.fechaInicio));
+    const lastTripEnd = sortedByDate[0] ? new Date(sortedByDate[0].fechaFinal || sortedByDate[0].fechaInicio) : null;
+    const daysSinceLast = lastTripEnd ? Math.floor((new Date() - lastTripEnd) / 86400000) : '-';
+
+    // --- Travel Patterns ---
     const monthCounts = Array(12).fill(0);
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     trips.forEach(t => { monthCounts[new Date(t.fechaInicio).getMonth()]++; });
     const maxMonth = Math.max(...monthCounts);
-    const busiestMonthIdx = monthCounts.indexOf(maxMonth);
 
-    // Southern hemisphere seasons (Argentina)
-    const seasonMap = [0,0,1,1,1,2,2,2,3,3,3,0]; // Dec-Feb=Verano(0), Mar-May=Otoño(1), Jun-Aug=Invierno(2), Sep-Nov=Primavera(3)
-    const seasonNames = ['☀️ Verano', '🍂 Oto\u00f1o', '❄️ Invierno', '🌸 Primavera'];
-    const seasonCounts = [0, 0, 0, 0];
-    trips.forEach(t => { seasonCounts[seasonMap[new Date(t.fechaInicio).getMonth()]]++; });
-
-    // Travel streaks (consecutive months with trips)
+    // Travel frequency (trips per month average)
     const monthsWithTrips = new Set();
     trips.forEach(t => { const d = new Date(t.fechaInicio); monthsWithTrips.add(d.getFullYear() * 12 + d.getMonth()); });
-    const sortedMonths = [...monthsWithTrips].sort((a, b) => a - b);
-    let maxStreak = 0, streak = 1;
-    for (let i = 1; i < sortedMonths.length; i++) {
-        if (sortedMonths[i] === sortedMonths[i - 1] + 1) { streak++; maxStreak = Math.max(maxStreak, streak); }
-        else { streak = 1; }
-    }
-    maxStreak = Math.max(maxStreak, streak);
-    if (sortedMonths.length === 0) maxStreak = 0;
+    const sortedMonthKeys = [...monthsWithTrips].sort((a, b) => a - b);
+    const monthSpan = sortedMonthKeys.length > 1 ? (sortedMonthKeys[sortedMonthKeys.length - 1] - sortedMonthKeys[0] + 1) : 1;
+    const tripsPerMonth = (totalTrips / monthSpan).toFixed(1);
 
-    // --- Section 3: Geography ---
+    // --- Geography ---
     const placeCount = {};
     allDest.forEach(d => { placeCount[d.lugar] = (placeCount[d.lugar] || 0) + 1; });
     const placeEntries = Object.entries(placeCount).sort((a, b) => b[1] - a[1]);
-    const mostVisited = placeEntries[0];
-    const newPlaces = placeEntries.filter(([_, c]) => c === 1).length;
-    const revisitedPlaces = placeEntries.filter(([_, c]) => c > 1).length;
-    const avgDestsPerTrip = (allDest.length / totalTrips).toFixed(1);
+    const topDestinations = placeEntries.slice(0, 5);
 
     let furthest = { name: '-', km: 0 };
     if (homeCoords) {
@@ -938,115 +928,152 @@ const DashboardView = ({ trips, homeCoords }) => {
             }
         });
     }
+    const worldLaps = (furthest.km / 40075).toFixed(1);
 
-    // --- Section 4: Social ---
-    const soloTrips = trips.filter(t => !t.personas || t.personas.length === 0).length;
-    const groupTrips = totalTrips - soloTrips;
-    const motivoCount = {};
-    trips.forEach(t => { motivoCount[t.motivo] = (motivoCount[t.motivo] || 0) + 1; });
-    const motivoEntries = Object.entries(motivoCount).sort((a, b) => b[1] - a[1]);
-    const maxMotivo = motivoEntries.length > 0 ? motivoEntries[0][1] : 1;
+    // Country & continent
+    const countryCount = {};
+    allDest.forEach(d => { if (d.pais) countryCount[d.pais] = (countryCount[d.pais] || 0) + 1; });
+    const topCountry = Object.entries(countryCount).sort((a, b) => b[1] - a[1])[0];
 
+    const continentCount = {};
+    allDest.forEach(d => { if (d.continente) continentCount[d.continente] = (continentCount[d.continente] || 0) + 1; });
+    const topContinent = Object.entries(continentCount).sort((a, b) => b[1] - a[1])[0];
+
+    // --- Social / Company ---
     const peopleStats = {};
     trips.forEach(trip => {
+        const tripDays = Math.max(1, trip.fechaFinal ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / 86400000) : 1);
         trip.personas.forEach(p => {
-            if (!peopleStats[p.nombre]) peopleStats[p.nombre] = { count: 0, foto: p.foto };
+            if (!peopleStats[p.nombre]) peopleStats[p.nombre] = { count: 0, days: 0, foto: p.foto };
             peopleStats[p.nombre].count++;
+            peopleStats[p.nombre].days += tripDays;
             if (p.foto && !peopleStats[p.nombre].foto) peopleStats[p.nombre].foto = p.foto;
         });
     });
-    const topCompanion = Object.entries(peopleStats).sort((a, b) => b[1].count - a[1].count)[0];
-    const groupSizes = trips.filter(t => t.personas.length > 0).map(t => t.personas.length + 1);
-    const avgGroupSize = groupSizes.length > 0 ? (groupSizes.reduce((a, b) => a + b, 0) / groupSizes.length).toFixed(1) : '-';
+    const topCompanions = Object.entries(peopleStats).sort((a, b) => b[1].count - a[1].count).slice(0, 3);
+
+    // SVG line chart
+    const chartW = 100, chartH = 40;
+    const linePoints = monthCounts.map((c, i) => {
+        const x = (i / 11) * chartW;
+        const y = maxMonth > 0 ? chartH - (c / maxMonth) * chartH : chartH;
+        return x + ',' + y;
+    }).join(' ');
 
     return (
-        h('div', null,
-            /* Section 1: Overview Cards */
-            h('div', {className: 'dashboard-section'},
-                h('h2', {className: 'dashboard-section-title'}, '📊 Resumen General'),
-                h('div', {className: 'dashboard-grid'},
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '✈️'), h('div', {className: 'metric-value'}, totalTrips), h('div', {className: 'metric-label'}, 'Viajes')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '📅'), h('div', {className: 'metric-value'}, totalDays), h('div', {className: 'metric-label'}, 'D\u00edas viajando')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🗺️'), h('div', {className: 'metric-value'}, uniquePlaces), h('div', {className: 'metric-label'}, 'Lugares \u00fanicos')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🌍'), h('div', {className: 'metric-value'}, Math.round(totalKm).toLocaleString()), h('div', {className: 'metric-label'}, 'Kil\u00f3metros'), h('div', {className: 'metric-detail'}, (totalKm / 40075).toFixed(2), 'x la vuelta al mundo')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '⏱️'), h('div', {className: 'metric-value'}, avgTripLength), h('div', {className: 'metric-label'}, 'Promedio d\u00edas/viaje')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🏆'), h('div', {className: 'metric-value'}, longestTrip.days, 'd'), h('div', {className: 'metric-label'}, 'Viaje m\u00e1s largo'), h('div', {className: 'metric-detail'}, longestTrip.name))
+        h('div', {className: 'bento-grid'},
+
+            /* === ROW 1-2 LEFT: TRIPS (2col x 2row) === */
+            h('div', {className: 'bento-card bento-trips'},
+                h('div', {className: 'bento-value-xl'}, totalTrips),
+                h('div', {className: 'bento-label'}, 'Viajes')
+            ),
+
+            /* === ROW 1 CENTER: 3 small cards stacked horizontally === */
+            h('div', {className: 'bento-card bento-traveldays'},
+                h('div', {className: 'bento-value-lg'}, totalDays),
+                h('div', {className: 'bento-label'}, 'Dias viajando')
+            ),
+
+            h('div', {className: 'bento-card bento-distance'},
+                h('div', {className: 'bento-value-lg'}, Math.round(totalKm).toLocaleString()),
+                h('div', {className: 'bento-label'}, 'Km recorridos')
+            ),
+
+            h('div', {className: 'bento-card bento-dayssince'},
+                h('div', {className: 'bento-value-lg'}, daysSinceLast),
+                h('div', {className: 'bento-label'}, 'Dias desde ultimo viaje')
+            ),
+
+            /* === ROW 1-2 RIGHT: LONGEST TRIP (4col x 2row) === */
+            h('div', {className: 'bento-card bento-longest'},
+                h('div', {className: 'bento-value-xl'}, longestTrip.days, 'd'),
+                h('div', {className: 'bento-label'}, 'Viaje mas largo'),
+                h('div', {className: 'bento-sub'}, longestTrip.name),
+                h('div', {className: 'bento-sub'}, longestPct, '% del año')
+            ),
+
+            /* === ROW 3-4 CENTER: TRAVELED MONTHS (4col x 2row) === */
+            h('div', {className: 'bento-card bento-monthly'},
+                h('div', {className: 'bento-label'}, 'Meses viajados'),
+                h('div', {className: 'bento-chart-area'},
+                    h('svg', {viewBox: '0 0 100 40', className: 'bento-line-svg', preserveAspectRatio: 'none'},
+                        h('polyline', {points: linePoints, fill: 'none', stroke: '#999', strokeWidth: '1.5', strokeLinejoin: 'round', strokeLinecap: 'round'}),
+                        monthCounts.map((c, i) => (
+                            h('circle', {key: i, cx: (i / 11) * chartW, cy: maxMonth > 0 ? chartH - (c / maxMonth) * chartH : chartH, r: '1.5', fill: '#666'})
+                        ))
+                    ),
+                    h('div', {className: 'bento-chart-labels'},
+                        monthNames.map((m, i) => h('span', {key: i}, m))
+                    )
                 )
             ),
 
-            /* Section 2: Travel Patterns */
-            h('div', {className: 'dashboard-section'},
-                h('h2', {className: 'dashboard-section-title'}, '📈 Patrones de Viaje'),
-                h('div', {style: {background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '2px solid var(--border)', marginBottom: '1.5rem'}},
-                    h('h3', {style: {fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '1.25rem'}}, 'Frecuencia Mensual'),
-                    monthNames.map((m, i) => (
-                        h('div', {key: i, className: 'dashboard-bar-row'},
-                            h('div', {className: 'dashboard-bar-label', style: {fontWeight: i === busiestMonthIdx ? '800' : '600', color: i === busiestMonthIdx ? 'var(--primary)' : 'var(--secondary)'}}, m),
-                            h('div', {className: 'dashboard-bar-track'},
-                                h('div', {className: 'dashboard-bar-fill', style: {width: maxMonth > 0 ? Math.max(monthCounts[i] > 0 ? 8 : 0, (monthCounts[i] / maxMonth) * 100) + '%' : '0%', background: i === busiestMonthIdx ? 'linear-gradient(135deg, var(--accent) 0%, #d14060 100%)' : undefined}},
-                                    monthCounts[i] > 0 && h('span', {className: 'dashboard-bar-value'}, monthCounts[i])
-                                )
-                            )
+            /* === ROW 3-4 RIGHT: FURTHEST DEST (4col x 2row) === */
+            h('div', {className: 'bento-card bento-furthest'},
+                h('div', {className: 'bento-value-xl'}, furthest.km > 0 ? Math.round(furthest.km).toLocaleString() : '-'),
+                h('div', {className: 'bento-label'}, 'Destino mas lejano'),
+                furthest.km > 0 && h('div', {className: 'bento-sub'}, furthest.name),
+                furthest.km > 0 && h('div', {className: 'bento-sub'}, worldLaps, 'x vuelta al mundo')
+            ),
+
+            /* === ROW 3-5 LEFT: MOST VISITED DESTINATIONS (2col x 3row) === */
+            h('div', {className: 'bento-card bento-mostvisited'},
+                h('div', {className: 'bento-label'}, 'Destinos mas visitados'),
+                h('div', {className: 'bento-top-list'},
+                    topDestinations.map(([name, count]) => (
+                        h('div', {key: name, className: 'bento-top-item'},
+                            h('span', null, name),
+                            h('span', {className: 'bento-top-count'}, count)
                         )
                     ))
-                ),
-                h('div', {className: 'dashboard-mini-grid'},
-                    seasonNames.map((s, i) => (
-                        h('div', {key: i, className: 'dashboard-mini-card'},
-                            h('div', {style: {fontSize: '1.5rem', marginBottom: '0.25rem'}}, s),
-                            h('div', {className: 'dashboard-mini-value'}, seasonCounts[i]),
-                            h('div', {className: 'dashboard-mini-label'}, 'viajes')
+                )
+            ),
+
+            /* === ROW 6 LEFT: Top country + Top continent (1col each) === */
+            h('div', {className: 'bento-card bento-topcountry'},
+                h('div', {className: 'bento-value-sm'}, topCountry ? topCountry[0] : '-'),
+                h('div', {className: 'bento-label'}, 'Top pais')
+            ),
+
+            h('div', {className: 'bento-card bento-topcontinent'},
+                h('div', {className: 'bento-value-sm'}, topContinent ? topContinent[0] : '-'),
+                h('div', {className: 'bento-label'}, 'Top continente')
+            ),
+
+            /* === ROW 5-6 CENTER: Travel frequency + Avg trip length === */
+            h('div', {className: 'bento-card bento-frequency'},
+                h('div', {className: 'bento-value-lg'}, tripsPerMonth),
+                h('div', {className: 'bento-label'}, 'Viajes/mes')
+            ),
+
+            h('div', {className: 'bento-card bento-avgtrip'},
+                h('div', {className: 'bento-value-lg'}, avgTripLength, 'd'),
+                h('div', {className: 'bento-label'}, 'Promedio dias/viaje')
+            ),
+
+            /* === ROW 3-6 RIGHT: TOP COMPANIONS (4col x tall) === */
+            h('div', {className: 'bento-card bento-companions'},
+                h('div', {className: 'bento-label'}, 'Top compañeros'),
+                h('div', {className: 'bento-companions-list'},
+                    topCompanions.map(([name, data]) => (
+                        h('div', {key: name, className: 'bento-companion-row'},
+                            h('div', {className: 'bento-companion-avatar'},
+                                data.foto ? h('img', {src: data.foto, alt: name}) : null
+                            ),
+                            h('div', {className: 'bento-companion-info'},
+                                h('div', {className: 'bento-companion-name'}, name),
+                                h('div', {className: 'bento-companion-detail'}, data.days, ' dias viajando juntos')
+                            )
                         )
                     )),
-                    h('div', {className: 'dashboard-mini-card'},
-                        h('div', {style: {fontSize: '1.5rem', marginBottom: '0.25rem'}}, '🔥'),
-                        h('div', {className: 'dashboard-mini-value'}, maxStreak),
-                        h('div', {className: 'dashboard-mini-label'}, 'Racha (meses consecutivos)')
-                    )
-                )
-            ),
-
-            /* Section 3: Geography */
-            h('div', {className: 'dashboard-section'},
-                h('h2', {className: 'dashboard-section-title'}, '🌎 Geograf\u00eda'),
-                h('div', {className: 'dashboard-grid'},
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🆕'), h('div', {className: 'metric-value'}, newPlaces), h('div', {className: 'metric-label'}, 'Lugares nuevos')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🔄'), h('div', {className: 'metric-value'}, revisitedPlaces), h('div', {className: 'metric-label'}, 'Lugares revisitados')),
-                    furthest.km > 0 && h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '📏'), h('div', {className: 'metric-value'}, Math.round(furthest.km).toLocaleString(), ' km'), h('div', {className: 'metric-label'}, 'Destino m\u00e1s lejano'), h('div', {className: 'metric-detail'}, furthest.name)),
-                    mostVisited && h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '❤️'), h('div', {className: 'metric-value'}, mostVisited[1]), h('div', {className: 'metric-label'}, 'Lugar m\u00e1s visitado'), h('div', {className: 'metric-detail'}, mostVisited[0])),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '📍'), h('div', {className: 'metric-value'}, avgDestsPerTrip), h('div', {className: 'metric-label'}, 'Destinos por viaje (prom.)'))
-                )
-            ),
-
-            /* Section 4: Social */
-            h('div', {className: 'dashboard-section'},
-                h('h2', {className: 'dashboard-section-title'}, '👥 Social'),
-                h('div', {className: 'dashboard-grid'},
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🧍'), h('div', {className: 'metric-value'}, soloTrips), h('div', {className: 'metric-label'}, 'Viajes solo/a')),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '👫'), h('div', {className: 'metric-value'}, groupTrips), h('div', {className: 'metric-label'}, 'Viajes en grupo')),
-                    topCompanion && h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '🥇'), h('div', {className: 'metric-value'}, topCompanion[1].count), h('div', {className: 'metric-label'}, 'Compa\u00f1ero/a top'), h('div', {className: 'metric-detail'}, topCompanion[0])),
-                    h('div', {className: 'metric-card'}, h('div', {className: 'metric-icon'}, '👥'), h('div', {className: 'metric-value'}, avgGroupSize), h('div', {className: 'metric-label'}, 'Tama\u00f1o grupo (prom.)'))
-                ),
-
-                motivoEntries.length > 0 && (
-                    h('div', {style: {background: 'white', padding: '2rem', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '2px solid var(--border)', marginTop: '1.5rem'}},
-                        h('h3', {style: {fontSize: '1.1rem', color: 'var(--secondary)', marginBottom: '1.25rem'}}, 'Viajes por Motivo'),
-                        motivoEntries.map(([motivo, count]) => (
-                            h('div', {key: motivo, className: 'dashboard-bar-row'},
-                                h('div', {className: 'dashboard-bar-label'}, getMotivoEmoji(motivo), ' ', motivo),
-                                h('div', {className: 'dashboard-bar-track'},
-                                    h('div', {className: 'dashboard-bar-fill', style: {width: Math.max(8, (count / maxMotivo) * 100) + '%'}},
-                                        h('span', {className: 'dashboard-bar-value'}, count)
-                                    )
-                                )
-                            )
-                        ))
-                    )
+                    topCompanions.length === 0 && h('div', {className: 'bento-sub'}, 'Sin compañeros registrados')
                 )
             )
         )
     );
 };
+
 
 const WrappedView = ({ trips, selectedYear }) => {
     const yearTrips = trips;
