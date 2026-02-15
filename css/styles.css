@@ -197,7 +197,7 @@ textarea { min-height: 100px; resize: vertical; }
 .bento-grid {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: repeat(6, minmax(80px, auto));
+    grid-template-rows: auto repeat(5, minmax(80px, 1fr));
     gap: 10px;
     max-width: 1400px;
 }
