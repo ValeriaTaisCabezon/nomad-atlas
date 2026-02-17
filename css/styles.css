@@ -1,7 +1,7 @@
 :root { --primary: #d4a574; --secondary: #2a5a4a; --accent: #E8C468; --dark: #2C2C2C; --light: #F5EDE3; --border: #d4c5b0; --text-secondary: #6B6259; --text-muted: #9A9088;
   /* Folder-tab section colors */
   --tab-trips: #F5E6D8; --tab-map: #F5E6D8; --tab-timeline: #F5E6D8; --tab-dashboard: #F5E6D8;
-  --bg-trips: #E8F0FA; --bg-map: #EFF5F3; --bg-timeline: #F0ECF5; --bg-dashboard: #FBF0E8; --bg-settings: #F5EDE3;
+  --bg-trips: #F5E6D8; --bg-map: #F5E6D8; --bg-timeline: #F5E6D8; --bg-dashboard: #F5E6D8; --bg-settings: #F5E6D8;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Outfit', sans-serif; background: var(--light); color: var(--dark); overflow-x: hidden; }
