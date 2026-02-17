@@ -1,46 +1,74 @@
-:root { --primary: #d4a574; --secondary: #2a5a4a; --accent: #e85d75; --dark: #1a1a1a; --light: #f8f5f0; --border: #d4c5b0; }
+:root { --primary: #d4a574; --secondary: #2a5a4a; --accent: #E8C468; --dark: #2C2C2C; --light: #F5EDE3; --border: #d4c5b0; --text-secondary: #6B6259; --text-muted: #9A9088;
+  /* Folder-tab section colors */
+  --tab-trips: #F5E6D8; --tab-map: #F5E6D8; --tab-timeline: #F5E6D8; --tab-dashboard: #F5E6D8;
+  --bg-trips: #E8F0FA; --bg-map: #EFF5F3; --bg-timeline: #F0ECF5; --bg-dashboard: #FBF0E8; --bg-settings: #F5EDE3;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Work Sans', sans-serif; background: var(--light); color: var(--dark); overflow-x: hidden; }
-h1, h2, h3 { font-family: 'Playfair Display', serif; font-weight: 900; }
+body { font-family: 'Outfit', sans-serif; background: var(--light); color: var(--dark); overflow-x: hidden; }
+h1, h2, h3 { font-family: 'Exo 2', sans-serif; font-weight: 700; }
 
-.header { background: linear-gradient(135deg, var(--secondary) 0%, #1e4339 100%); color: white; padding: 2rem; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
-.header-content { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-.logo { font-size: 2rem; font-weight: 900; }
-.nav-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.nav-tab { padding: 0.75rem 1.5rem; background: rgba(255,255,255,0.1); border: none; color: white; cursor: pointer; border-radius: 8px; font-weight: 500; transition: all 0.3s; }
-.nav-tab:hover:not(:disabled) { background: rgba(255,255,255,0.2); transform: translateY(-2px); }
-.nav-tab.active { background: var(--primary); color: var(--dark); }
-.nav-tab:disabled { opacity: 0.5; cursor: not-allowed; }
+/* ===== FOLDER-TAB NAVIGATION ===== */
+.folder-nav { position: sticky; top: 0; z-index: 1000; background: var(--light); }
+.folder-nav-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: flex-end; justify-content: space-between; padding: 1.75rem 2rem 0; }
+.folder-nav-brand { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.4rem; color: var(--dark); padding-bottom: 0.85rem; letter-spacing: -0.5px; white-space: nowrap; }
+.folder-tabs { display: flex; gap: 4px; align-items: flex-end; }
+.folder-tab { padding: 0.6rem 1.6rem; border-radius: 10px 10px 0 0; border: 1.5px solid var(--border); border-bottom: none; background: #EDE5DB; position: relative; bottom: -1.5px; z-index: 1; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; transition: background-color 0.25s ease, color 0.2s ease, box-shadow 0.25s ease; }
+.folder-tab:hover:not(:disabled):not(.active) { background: #F5EDE3; color: var(--dark); }
+.folder-tab.active { z-index: 2; color: var(--dark); font-weight: 700; border-color: var(--border); box-shadow: 0 -2px 6px rgba(0,0,0,0.04); }
+.folder-tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.main-content { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+/* ===== SETTINGS BUTTON (fixed bottom-left) ===== */
+.settings-btn-fixed { position: fixed; bottom: 1.5rem; left: 1.5rem; z-index: 900; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--border); background: #FEFCF9; box-shadow: 0 2px 10px rgba(0,0,0,0.08); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; color: var(--text-secondary); }
+.settings-btn-fixed:hover { background: var(--primary); color: white; border-color: var(--primary); transform: scale(1.08); }
+.settings-btn-fixed.active { background: var(--secondary); color: white; border-color: var(--secondary); }
 
-.profile-section { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 2rem; border: 2px solid var(--border); }
+/* ===== YEAR DROPDOWN (fixed bottom-right) ===== */
+.year-dropdown-wrapper { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 900; }
+.year-dropdown-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 22px; border: 1.5px solid var(--border); background: #FEFCF9; box-shadow: 0 2px 10px rgba(0,0,0,0.08); cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.85rem; color: var(--dark); transition: all 0.3s ease; }
+.year-dropdown-btn:hover { border-color: var(--primary); background: white; }
+.year-dropdown-btn svg { flex-shrink: 0; transition: transform 0.2s ease; }
+.year-dropdown-btn.open svg { transform: rotate(180deg); }
+.year-dropdown-menu { position: absolute; bottom: calc(100% + 8px); right: 0; background: #FEFCF9; border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); padding: 0.4rem; min-width: 120px; display: flex; flex-direction: column; gap: 2px; animation: yearDropIn 0.15s ease; }
+@keyframes yearDropIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.year-dropdown-item { padding: 0.5rem 1rem; border-radius: 8px; border: none; background: transparent; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 0.85rem; color: var(--dark); text-align: left; transition: all 0.15s ease; }
+.year-dropdown-item:hover { background: var(--light); }
+.year-dropdown-item.active { background: var(--primary); color: white; font-weight: 600; }
+
+/* Legacy classes kept for backward compat */
+.header { display: none; }
+.nav-tabs { display: none; }
+.nav-tab { display: none; }
+
+.main-content { max-width: 1400px; margin: 0 auto; padding: 2rem; transition: background-color 0.3s ease; }
+.main-content-bg { min-height: calc(100vh - 70px); max-width: 1400px; margin: -1.5px auto 0; border: 1.5px solid var(--border); border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); transition: background-color 0.3s ease; position: relative; z-index: 0; }
+
+.profile-section { background: #FEFCF9; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 2rem; border: none; }
 .profile-header { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
 .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--primary) 0%, #c89456 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem; color: white; }
-.profile-info h2 { font-size: 2rem; color: var(--secondary); margin-bottom: 0.5rem; }
+.profile-info h2 { font-size: 2rem; color: var(--dark); margin-bottom: 0.5rem; font-family: 'Exo 2', sans-serif; }
 
 .map-container { height: 70vh; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.12); margin-bottom: 2rem; }
 #map { height: 100%; width: 100%; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 2rem; overflow-y: auto; }
-.modal-content { background: white; border-radius: 20px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; }
-.modal-header { padding: 2rem; border-bottom: 2px solid var(--border); position: sticky; top: 0; background: white; z-index: 10; }
+.modal-content { background: #FEFCF9; border-radius: 20px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; }
+.modal-header { padding: 2rem; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: #FEFCF9; z-index: 10; }
 .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--light); border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.5rem; transition: all 0.3s; }
 .modal-close:hover { background: var(--primary); color: white; transform: rotate(90deg); }
 .modal-body { padding: 2rem; }
-.trip-detail-title { font-size: 2.5rem; color: var(--secondary); margin-bottom: 1rem; }
+.trip-detail-title { font-size: 2.5rem; color: var(--dark); margin-bottom: 1rem; font-family: 'Exo 2', sans-serif; }
 .trip-detail-meta { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; }
 .trip-detail-meta-item { display: flex; align-items: center; gap: 0.5rem; }
 .trip-detail-map { height: 400px; border-radius: 12px; overflow: hidden; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
 
-.add-trip-section { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 2rem; border: 2px solid var(--border); }
-.form-title { font-size: 1.8rem; margin-bottom: 1.5rem; color: var(--secondary); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.add-trip-section { background: #FEFCF9; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 2rem; border: none; }
+.form-title { font-size: 1.8rem; margin-bottom: 1.5rem; color: var(--dark); font-family: 'Exo 2', sans-serif; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
 .form-section { margin-bottom: 2rem; padding: 1.5rem; background: var(--light); border-radius: 12px; }
-.form-section-title { font-size: 1.2rem; margin-bottom: 1rem; color: var(--secondary); font-weight: 600; }
+.form-section-title { font-size: 1.2rem; margin-bottom: 1rem; color: var(--dark); font-weight: 600; font-family: 'Exo 2', sans-serif; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
 .form-group { display: flex; flex-direction: column; }
-label { font-weight: 600; margin-bottom: 0.5rem; color: var(--secondary); font-size: 0.9rem; text-transform: uppercase; }
-input, textarea, select { padding: 0.875rem; border: 2px solid var(--border); border-radius: 8px; font-family: 'Work Sans', sans-serif; font-size: 1rem; transition: all 0.3s; }
+label { font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; }
+input, textarea, select { padding: 0.875rem; border: 2px solid var(--border); border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 1rem; transition: all 0.3s; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(212,165,116,0.1); }
 textarea { min-height: 100px; resize: vertical; }
 
@@ -53,8 +81,8 @@ textarea { min-height: 100px; resize: vertical; }
 .suggested-person:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
 .destinations-list { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
-.destination-item { background: white; padding: 1.5rem; border-radius: 12px; border: 2px solid var(--border); position: relative; }
-.destination-item h4 { font-size: 1.1rem; color: var(--secondary); margin-bottom: 1rem; }
+.destination-item { background: #FEFCF9; padding: 1.5rem; border-radius: 12px; border: 1.5px solid var(--border); position: relative; }
+.destination-item h4 { font-size: 1.1rem; color: var(--dark); margin-bottom: 1rem; font-family: 'Exo 2', sans-serif; }
 .btn-remove { position: absolute; top: 1rem; right: 1rem; background: #dc3545; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; transition: all 0.3s; }
 .btn-remove:hover { background: #c82333; transform: scale(1.1); }
 .btn-edit-destino { background: var(--secondary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; margin-top: 0.5rem; }
@@ -74,57 +102,57 @@ textarea { min-height: 100px; resize: vertical; }
 .file-input-label:hover { border-color: var(--primary); background: white; }
 .image-preview { width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-top: 1rem; }
 
-.timeline-year-container { margin-bottom: 4rem; background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-.timeline-year-header { font-size: 2.5rem; color: var(--primary); margin-bottom: 2rem; text-align: center; }
+.timeline-year-container { margin-bottom: 4rem; background: #FEFCF9; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+.timeline-year-header { font-size: 2.5rem; color: var(--dark); margin-bottom: 2rem; text-align: center; font-family: 'Exo 2', sans-serif; font-weight: 800; }
 .timeline-horizontal { position: relative; padding: 3rem 0; }
 .timeline-line { position: absolute; top: 50%; left: 0; right: 0; height: 4px; background: var(--border); transform: translateY(-50%); }
 .timeline-months { display: flex; justify-content: space-between; position: relative; }
 .timeline-month { flex: 1; text-align: center; position: relative; }
 .timeline-month-dot { width: 16px; height: 16px; background: var(--primary); border-radius: 50%; margin: 0 auto 0.5rem; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: relative; z-index: 2; }
-.timeline-month-label { font-size: 0.85rem; font-weight: 600; color: var(--secondary); margin-bottom: 1rem; }
+.timeline-month-label { font-size: 0.85rem; font-weight: 600; color: var(--dark); margin-bottom: 1rem; font-family: 'Exo 2', sans-serif; }
 .timeline-month-trips { display: flex; flex-direction: column; gap: 0.75rem; align-items: center; }
-.timeline-trip-mini { background: white; border: 2px solid var(--border); border-radius: 8px; padding: 0.5rem; min-width: 80px; max-width: 120px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.timeline-trip-mini:hover { transform: scale(1.1); border-color: var(--primary); box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 10; }
+.timeline-trip-mini { background: #FEFCF9; border: none; border-radius: 8px; padding: 0.5rem; min-width: 80px; max-width: 120px; cursor: pointer; transition: all 0.3s; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.timeline-trip-mini:hover { transform: scale(1.1); box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 10; }
 .timeline-trip-mini-image { width: 100%; height: 50px; object-fit: cover; border-radius: 4px; margin-bottom: 0.35rem; }
-.timeline-trip-mini-title { font-size: 0.7rem; font-weight: 700; color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0.25rem; }
-.timeline-trip-mini-meta { font-size: 0.65rem; color: #888; display: flex; align-items: center; justify-content: center; gap: 0.25rem; }
+.timeline-trip-mini-title { font-size: 0.7rem; font-weight: 700; color: var(--dark); font-family: 'Exo 2', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0.25rem; }
+.timeline-trip-mini-meta { font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 0.25rem; }
 
 .dashboard-section { margin-bottom: 3rem; }
-.dashboard-section-title { font-size: 2rem; color: var(--secondary); margin-bottom: 2rem; }
+.dashboard-section-title { font-size: 2rem; color: var(--dark); margin-bottom: 2rem; font-family: 'Exo 2', sans-serif; }
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-.metric-card { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); transition: all 0.3s; }
-.metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
+.metric-card { background: #FEFCF9; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: none; transition: all 0.3s; }
+.metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
 .metric-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.8; }
-.metric-value { font-size: 3.5rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; margin-bottom: 0.5rem; }
-.metric-label { font-size: 0.85rem; color: #666; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.metric-value { font-size: 3.5rem; font-weight: 800; color: var(--dark); font-family: 'Exo 2', sans-serif; margin-bottom: 0.5rem; }
+.metric-label { font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
 .metric-detail { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--secondary); }
 
 .top-destinations-row { display: flex; gap: 1.5rem; overflow-x: auto; padding: 1rem 0; }
-.top-dest-card { background: white; padding: 2rem 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); min-width: 220px; flex-shrink: 0; text-align: center; transition: all 0.3s; }
-.top-dest-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
-.top-dest-name { font-size: 1.6rem; font-weight: 700; color: var(--secondary); margin-bottom: 1rem; }
-.top-dest-count { font-size: 3rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
-.top-dest-label { font-size: 0.8rem; color: #888; text-transform: uppercase; margin-top: 0.5rem; }
+.top-dest-card { background: #FEFCF9; padding: 2rem 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: none; min-width: 220px; flex-shrink: 0; text-align: center; transition: all 0.3s; }
+.top-dest-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+.top-dest-name { font-size: 1.6rem; font-weight: 700; color: var(--dark); font-family: 'Exo 2', sans-serif; margin-bottom: 1rem; }
+.top-dest-count { font-size: 3rem; font-weight: 800; color: var(--dark); font-family: 'Exo 2', sans-serif; }
+.top-dest-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.5rem; }
 
 .people-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; }
-.person-metric-card { background: white; padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border: 2px solid var(--border); transition: all 0.3s; }
-.person-metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); border-color: var(--primary); }
+.person-metric-card { background: #FEFCF9; padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: none; transition: all 0.3s; }
+.person-metric-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
 .person-metric-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 .person-metric-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); flex-shrink: 0; }
 .person-metric-info { flex: 1; }
-.person-metric-name { font-size: 1.3rem; font-weight: 700; color: var(--secondary); margin-bottom: 0.25rem; }
-.person-metric-main { font-size: 1.8rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
+.person-metric-name { font-size: 1.3rem; font-weight: 700; color: var(--dark); font-family: 'Exo 2', sans-serif; margin-bottom: 0.25rem; }
+.person-metric-main { font-size: 1.8rem; font-weight: 800; color: var(--dark); font-family: 'Exo 2', sans-serif; }
 .person-metric-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 .person-metric-stat { background: var(--light); padding: 1rem; border-radius: 12px; text-align: center; }
-.person-metric-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--secondary); margin-bottom: 0.25rem; }
-.person-metric-stat-label { font-size: 0.75rem; color: #666; text-transform: uppercase; }
+.person-metric-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--dark); font-family: 'Exo 2', sans-serif; margin-bottom: 0.25rem; }
+.person-metric-stat-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
 
 .wrapped-container { max-height: 85vh; overflow-y: auto; }
 .wrapped-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; }
 .wrapped-card { background: linear-gradient(135deg, var(--secondary) 0%, #1e4339 100%); color: white; border-radius: 14px; padding: 1.5rem; position: relative; overflow: hidden; min-height: 160px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 20px rgba(0,0,0,0.12); transition: all 0.3s; }
 .wrapped-card:hover { transform: translateY(-3px); box-shadow: 0 6px 25px rgba(0,0,0,0.15); }
 .wrapped-card-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.9; }
-.wrapped-card-value { font-size: 2.5rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; margin-bottom: 0.25rem; line-height: 1; }
+.wrapped-card-value { font-size: 2.5rem; font-weight: 800; color: var(--accent); font-family: 'Exo 2', sans-serif; margin-bottom: 0.25rem; line-height: 1; }
 .wrapped-card-label { font-size: 0.95rem; opacity: 0.9; margin-bottom: 0.35rem; }
 .wrapped-card-detail { font-size: 0.75rem; opacity: 0.75; }
 .wrapped-places-card { grid-column: 1 / -1; max-height: 200px; }
@@ -132,14 +160,14 @@ textarea { min-height: 100px; resize: vertical; }
 .wrapped-place-tag { background: var(--primary); color: var(--dark); padding: 0.3rem 0.7rem; border-radius: 14px; font-weight: 600; font-size: 0.75rem; }
 
 .trips-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
-.trip-list-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); transition: all 0.3s; border: 2px solid var(--border); }
-.trip-list-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); border-color: var(--primary); }
+.trip-list-card { background: #FEFCF9; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.06); transition: all 0.3s; border: none; }
+.trip-list-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
 .trip-list-card-image { width: 100%; height: 200px; object-fit: cover; cursor: pointer; }
 .trip-list-card-content { padding: 1.5rem; cursor: pointer; }
-.trip-list-card-title { font-size: 1.4rem; color: var(--secondary); margin-bottom: 0.75rem; font-weight: 700; }
-.trip-list-card-date { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+.trip-list-card-title { font-size: 1.4rem; color: var(--dark); margin-bottom: 0.75rem; font-weight: 700; font-family: 'Exo 2', sans-serif; }
+.trip-list-card-date { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem; }
 .trip-list-card-meta { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.trip-list-card-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: #888; }
+.trip-list-card-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--text-muted); }
 
 .empty-state { text-align: center; padding: 4rem 2rem; color: #999; }
 .empty-state-icon { font-size: 5rem; margin-bottom: 1rem; opacity: 0.3; }
@@ -149,8 +177,8 @@ textarea { min-height: 100px; resize: vertical; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .csv-import { margin-top: 1rem; padding: 1.5rem; background: var(--light); border-radius: 12px; border: 2px dashed var(--border); }
-.csv-import h4 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--secondary); }
-.csv-help { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; line-height: 1.4; }
+.csv-import h4 { font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--dark); font-family: 'Exo 2', sans-serif; }
+.csv-help { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.4; }
 .csv-example { font-size: 0.8rem; font-family: monospace; background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; overflow-x: auto; }
 
 .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 3000; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -168,161 +196,218 @@ textarea { min-height: 100px; resize: vertical; }
 .csv-progress-bar { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin: 1rem 0; }
 .csv-progress-fill { height: 100%; background: var(--secondary); border-radius: 4px; transition: width 0.3s; }
 
-.year-selector-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem; padding: 1rem 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border: 2px solid var(--border); flex-wrap: wrap; }
-.year-chip { padding: 0.5rem 1.25rem; border-radius: 20px; border: 2px solid var(--border); background: white; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.3s; color: var(--dark); }
-.year-chip:hover { border-color: var(--primary); background: var(--light); }
-.year-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+.year-selector-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem; padding: 1rem 1.5rem; background: #FEFCF9; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); border: none; flex-wrap: wrap; }
+.year-chip { padding: 0.5rem 1.25rem; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.3s; color: var(--dark); font-family: 'Exo 2', sans-serif; }
+.year-chip:hover { border-color: #D4956A; background: rgba(212,149,106,0.08); }
+.year-chip.active { background: #D4956A; color: white; border-color: #D4956A; }
 
 .dashboard-bar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
-.dashboard-bar-label { min-width: 80px; font-size: 0.85rem; font-weight: 600; color: var(--secondary); text-align: right; }
+.dashboard-bar-label { min-width: 80px; font-size: 0.85rem; font-weight: 600; color: var(--dark); text-align: right; font-family: 'Exo 2', sans-serif; }
 .dashboard-bar-track { flex: 1; height: 24px; background: var(--light); border-radius: 12px; overflow: hidden; }
-.dashboard-bar-fill { height: 100%; background: linear-gradient(135deg, var(--primary) 0%, #c89456 100%); border-radius: 12px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 0.5rem; min-width: 24px; }
+.dashboard-bar-fill { height: 100%; background: linear-gradient(135deg, #D4956A 0%, #C4A882 100%); border-radius: 12px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 0.5rem; min-width: 24px; }
 .dashboard-bar-value { font-size: 0.75rem; font-weight: 700; color: white; }
-.dashboard-bar-count { min-width: 30px; font-size: 0.85rem; font-weight: 700; color: var(--secondary); text-align: left; }
+.dashboard-bar-count { min-width: 30px; font-size: 0.85rem; font-weight: 700; color: var(--dark); text-align: left; font-family: 'Exo 2', sans-serif; }
 .dashboard-mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
 .dashboard-mini-card { background: var(--light); padding: 1.25rem; border-radius: 12px; text-align: center; }
-.dashboard-mini-value { font-size: 2rem; font-weight: 900; color: var(--primary); font-family: 'Playfair Display', serif; }
-.dashboard-mini-label { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
+.dashboard-mini-value { font-size: 2rem; font-weight: 800; color: var(--dark); font-family: 'Exo 2', sans-serif; }
+.dashboard-mini-label { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; }
 
 /* ===== BENTO GRID DASHBOARD ===== */
 /*
-  Desktop layout (12-col, 6-row grid):
-  R1-2: [TRIPS 2x2] [Days 2x2] [Dist 2x2] [Since 2x2] [LONGEST 4x2     ]
-  R3-4: [MOST VISITED 2x3] [--- MONTHLY LINE 6x2 ----] [FURTHEST 4x2    ]
-  R5  : [MOST VIS cont   ] [Freq 2x2 ] [Avg 4x2     ] [COMPANIONS 4x2  ]
-  R6  : [Country 1x1][Cont 1x1] [Freq cont] [Avg cont] [COMPANIONS cont ]
+  Desktop layout (10-col, 6-row grid) — matches color diagram:
+  R1  : [TRIPS 2x2] [TRVLDAYS 2x2] [DIST 2x2] [FREQ 2x2] [SINCE 2x1 ]
+  R2  : [TRIPS cnt] [TRVLDAYS cnt] [DIST cnt] [FREQ cnt] [MOSTVIS 2x2]
+  R3  : [── LONGEST 3x2 ──────] [──── MONTHLY 5x2 ────────────] [MOSTVIS ct]
+  R4  : [── LONGEST cnt ──────] [──── MONTHLY cnt ────────────] [CNTRY 2x2]
+  R5  : [── FURTHEST 3x2 ─────] [AVGTRIP 2x1] [── COMP 3x2 ──] [CNTRY cnt]
+  R6  : [── FURTHEST cnt ─────] [AVGKM 2x1  ] [── COMP cnt ──] [CONT 2x1]
 */
 .bento-grid {
     display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: repeat(6, minmax(80px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(6, minmax(70px, auto));
+    gap: 8px;
     max-width: 1400px;
 }
 
 /* --- Card base --- */
 .bento-card {
-    background: #e8e8e8;
-    border-radius: 12px;
-    padding: 1.25rem;
+    background: #FEFCF9;
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-height: 0;
     overflow: hidden;
+    border: none;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
 
+/* --- Card accent backgrounds --- */
+.bento-trips       { background: #E8C468; }
+.bento-traveldays  { background: #B7C4A1; }
+.bento-distance    { background: #D4956A; }
+.bento-dayssince   { background: #89ACA4; }
+.bento-longest     { background: #E8C9AB; }
+.bento-monthly     { background: #FEFCF9; }
+.bento-furthest    { background: #C9A09A; }
+.bento-mostvisited { background: #8B9A6D; }
+.bento-topcountry  { background: #D9C4A0; }
+.bento-topcontinent{ background: #7D9590; }
+.bento-frequency   { background: #C4A882; }
+.bento-avgtrip     { background: #A3B1B8; }
+.bento-companions  { background: #DDD0C0; }
+.bento-avgkm       { background: #A89ABD; }
+
+/* --- Text color overrides for dark-bg cards --- */
+.bento-mostvisited .bento-label,
+.bento-topcontinent .bento-label { color: rgba(255,255,255,0.75); }
+.bento-mostvisited .bento-top-item,
+.bento-mostvisited .bento-top-count { color: #FFFFFF; }
+.bento-topcontinent .bento-value-sm { color: #FFFFFF; }
+
+/* --- Text color overrides for medium-bg cards --- */
+.bento-trips .bento-value-xl,
+.bento-traveldays .bento-value-xl,
+.bento-distance .bento-value-xl,
+.bento-dayssince .bento-value-lg,
+.bento-longest .bento-value-xl,
+.bento-furthest .bento-value-xl,
+.bento-mostvisited .bento-label,
+.bento-frequency .bento-value-xl,
+.bento-avgtrip .bento-value-lg,
+.bento-topcountry .bento-value-sm,
+.bento-avgkm .bento-value-lg { color: var(--dark); }
+
+.bento-trips .bento-label,
+.bento-traveldays .bento-label,
+.bento-distance .bento-label,
+.bento-dayssince .bento-label,
+.bento-longest .bento-label,
+.bento-furthest .bento-label,
+.bento-frequency .bento-label,
+.bento-avgtrip .bento-label,
+.bento-topcountry .bento-label,
+.bento-companions .bento-label,
+.bento-avgkm .bento-label { color: rgba(44,44,44,0.55); }
+
+.bento-longest .bento-sub,
+.bento-furthest .bento-sub { color: rgba(44,44,44,0.5); }
+
+/* --- Tall cards: column layout (Furthest 3x2, Longest 3x2, Companions 3x2) --- */
+.bento-furthest { flex-direction: column; }
+.bento-longest { flex-direction: column; }
+.bento-companions { flex-direction: column; justify-content: flex-start; }
+
 /* --- Typography --- */
-.bento-value-xl { font-size: 4rem; font-weight: 900; line-height: 1; font-family: 'Playfair Display', serif; }
-.bento-value-lg { font-size: 2.2rem; font-weight: 900; line-height: 1.1; font-family: 'Playfair Display', serif; }
-.bento-value-sm { font-size: 1.2rem; font-weight: 700; line-height: 1.2; }
-.bento-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; color: #666; margin-top: 0.35rem; }
-.bento-sub { font-size: 0.75rem; color: #888; margin-top: 0.25rem; }
+.bento-value-xl { font-size: 4rem; font-weight: 700; line-height: 1; font-family: 'Exo 2', sans-serif; color: var(--dark); }
+.bento-value-lg { font-size: 2.8rem; font-weight: 700; line-height: 1; font-family: 'Exo 2', sans-serif; color: var(--dark); }
+.bento-value-sm { font-size: 1.2rem; font-weight: 700; line-height: 1.2; font-family: 'Exo 2', sans-serif; }
+.bento-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 500; color: var(--text-secondary); margin-top: 0.15rem; font-family: 'Outfit', sans-serif; }
+.bento-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.1rem; font-family: 'Outfit', sans-serif; }
 
-/* === EXPLICIT GRID PLACEMENT === */
+/* === EXPLICIT GRID PLACEMENT (10-col × 6-row, matches color diagram) === */
 
-/* R1-2, C1-2: TRIPS */
-.bento-trips { grid-column: 1 / 3; grid-row: 1 / 3; }
+/* R1-2: four 2×2 stat cards + DaysSince 2×1 */
+.bento-trips       { grid-column: 1 / 3;   grid-row: 1 / 3; }
+.bento-traveldays  { grid-column: 3 / 5;   grid-row: 1 / 3; }
+.bento-distance    { grid-column: 5 / 7;   grid-row: 1 / 3; }
+.bento-frequency   { grid-column: 7 / 9;   grid-row: 1 / 3; }
+.bento-dayssince   { grid-column: 9 / 11;  grid-row: 1 / 2; }
 
-/* R1-2, C3-4: Total travel days */
-.bento-traveldays { grid-column: 3 / 5; grid-row: 1 / 3; }
+/* R2-3: Most Visited (olive, 2×2) */
+.bento-mostvisited { grid-column: 9 / 11;  grid-row: 2 / 4; justify-content: flex-start; }
 
-/* R1-2, C5-6: Total distance */
-.bento-distance { grid-column: 5 / 7; grid-row: 1 / 3; }
+/* R3-4: Longest (peach, 3×2) + Monthly (white, 5×2) */
+.bento-longest     { grid-column: 1 / 4;   grid-row: 3 / 5; }
+.bento-monthly     { grid-column: 4 / 9;   grid-row: 3 / 5; justify-content: flex-start; }
 
-/* R1-2, C7-8: Days since last trip */
-.bento-dayssince { grid-column: 7 / 9; grid-row: 1 / 3; }
+/* R4-5: Top Country (sand, 2×2) */
+.bento-topcountry  { grid-column: 9 / 11;  grid-row: 4 / 6; }
 
-/* R1-2, C9-12: LONGEST TRIP */
-.bento-longest { grid-column: 9 / 13; grid-row: 1 / 3; }
+/* R5-6: Furthest (rose, 3×2) + AvgTrip/AvgKm stacked + Companions (linen, 3×2) */
+.bento-furthest    { grid-column: 1 / 4;   grid-row: 5 / 7; }
+.bento-avgtrip     { grid-column: 4 / 6;   grid-row: 5 / 6; }
+.bento-avgkm       { grid-column: 4 / 6;   grid-row: 6 / 7; }
+.bento-companions  { grid-column: 6 / 9;   grid-row: 5 / 7; justify-content: flex-start; }
 
-/* R3-4, C3-8: MONTHLY LINE CHART */
-.bento-monthly { grid-column: 3 / 9; grid-row: 3 / 5; justify-content: flex-start; }
-
-/* R2-3, C9-12: FURTHEST DESTINATION (was originally missing — below longest) */
-/* Actually R3-4 per wireframe — longest is R1-2, furthest is below it */
-.bento-furthest { grid-column: 9 / 13; grid-row: 3 / 5; }
-
-/* R3-5, C1-2: MOST VISITED DESTINATIONS */
-.bento-mostvisited { grid-column: 1 / 3; grid-row: 3 / 6; justify-content: flex-start; }
-
-/* R6, C1: Top country */
-.bento-topcountry { grid-column: 1 / 2; grid-row: 6 / 7; }
-
-/* R6, C2: Top continent */
-.bento-topcontinent { grid-column: 2 / 3; grid-row: 6 / 7; }
-
-/* R5-6, C3-4: Travel frequency */
-.bento-frequency { grid-column: 3 / 5; grid-row: 5 / 7; }
-
-/* R5-6, C5-8: Average trip length */
-.bento-avgtrip { grid-column: 5 / 9; grid-row: 5 / 7; }
-
-/* R4-6, C9-12: TOP COMPANIONS */
-.bento-companions { grid-column: 9 / 13; grid-row: 5 / 7; justify-content: flex-start; }
+/* R6: Top Continent (teal-dark, 2×1) */
+.bento-topcontinent{ grid-column: 9 / 11;  grid-row: 6 / 7; }
 
 /* --- Chart area inside monthly card --- */
 .bento-chart-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .bento-line-svg { flex: 1; width: 100%; min-height: 0; }
-.bento-chart-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: #888; font-weight: 600; padding-top: 0.35rem; }
+.bento-chart-labels { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted); font-weight: 600; padding-top: 0.35rem; font-family: 'Outfit', sans-serif; }
 
 /* --- Top destinations list --- */
 .bento-top-list { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
-.bento-top-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #555; }
-.bento-top-count { font-weight: 700; color: #333; font-size: 0.8rem; }
+.bento-top-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: rgba(255,255,255,0.85); font-family: 'Outfit', sans-serif; }
+.bento-top-count { font-weight: 700; color: #FFFFFF; font-size: 0.8rem; font-family: 'Exo 2', sans-serif; }
 
 /* --- Companions card --- */
-.bento-companions-list { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+.bento-companions-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
 .bento-companion-row { display: flex; align-items: center; gap: 0.75rem; }
-.bento-companion-avatar { width: 36px; height: 36px; border-radius: 50%; background: #ccc; flex-shrink: 0; overflow: hidden; }
+.bento-companion-avatar { width: 36px; height: 36px; border-radius: 50%; background: #C4A882; flex-shrink: 0; overflow: hidden; }
 .bento-companion-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .bento-companion-info { flex: 1; }
-.bento-companion-name { font-size: 0.95rem; font-weight: 700; color: #333; }
-.bento-companion-detail { font-size: 0.75rem; color: #888; }
+.bento-companion-name { font-size: 0.95rem; font-weight: 700; color: var(--dark); font-family: 'Exo 2', sans-serif; }
+.bento-companion-detail { font-size: 0.75rem; color: var(--text-secondary); font-family: 'Outfit', sans-serif; }
 
 /* ===== TABLET BREAKPOINT ===== */
 /*
   Tablet layout (8-col, 7-row grid):
-  R1-2: [TRIPS 2x2] [Days 2x1] [Dist 2x1] [LONGEST 2x2]
-  R2:   [TRIPS cont] [DAYSSINCE 4x1 ─────] [LONGEST cont]
-  R3-4: [MONTHLY 4x2 ────────] [FURTHEST 4x2 ──────────]
-  R5-6: [MOSTVISITED 3x2 ──] [COMPANIONS 5x2 ──────────]
-  R7:   [Country 2x1] [Cont 2x1] [Freq 2x1] [Avg 2x1]
+  R1    : [TRIPS 2×1][TRVLDAYS 2×1][DIST 2×1][FREQ 2×1]
+  R2    : [SINCE 2×1][CNTRY 2×1   ][LONGEST 4×1 wide   ]
+  R3-4  : [MOSTVIS 2×2][MONTHLY 4×2          ][TOPCONT 2×2]
+  R5-6  : [FURTHEST 4×2          ][COMP 4×2             ]
+  R7    : [AVGTRIP 4×1 wide      ][AVGKM 4×1 wide      ]
 */
 @media (max-width: 1024px) {
+    .folder-nav-inner { padding: 0.5rem 1rem 0; }
+    .folder-tab { padding: 0.5rem 1.25rem; font-size: 0.8rem; }
+    .folder-nav-brand { font-size: 1.2rem; }
     .bento-grid {
         grid-template-columns: repeat(8, 1fr);
-        grid-template-rows: repeat(7, minmax(70px, auto));
+        grid-template-rows: repeat(7, minmax(65px, auto));
     }
-    .bento-trips       { grid-column: 1 / 3; grid-row: 1 / 3; }
+    .bento-trips       { grid-column: 1 / 3; grid-row: 1 / 2; }
     .bento-traveldays  { grid-column: 3 / 5; grid-row: 1 / 2; }
     .bento-distance    { grid-column: 5 / 7; grid-row: 1 / 2; }
-    .bento-longest     { grid-column: 7 / 9; grid-row: 1 / 3; }
-    .bento-dayssince   { grid-column: 3 / 7; grid-row: 2 / 3; }
-    .bento-monthly     { grid-column: 1 / 5; grid-row: 3 / 5; }
-    .bento-furthest    { grid-column: 5 / 9; grid-row: 3 / 5; }
-    .bento-mostvisited { grid-column: 1 / 4; grid-row: 5 / 7; }
-    .bento-companions  { grid-column: 4 / 9; grid-row: 5 / 7; }
-    .bento-topcountry  { grid-column: 1 / 3; grid-row: 7 / 8; }
-    .bento-topcontinent{ grid-column: 3 / 5; grid-row: 7 / 8; }
-    .bento-frequency   { grid-column: 5 / 7; grid-row: 7 / 8; }
-    .bento-avgtrip     { grid-column: 7 / 9; grid-row: 7 / 8; }
+    .bento-frequency   { grid-column: 7 / 9; grid-row: 1 / 2; }
+    .bento-dayssince   { grid-column: 1 / 3; grid-row: 2 / 3; }
+    .bento-topcountry  { grid-column: 3 / 5; grid-row: 2 / 3; }
+    .bento-longest     { grid-column: 5 / 9; grid-row: 2 / 3; }
+    .bento-mostvisited { grid-column: 1 / 3; grid-row: 3 / 5; }
+    .bento-monthly     { grid-column: 3 / 7; grid-row: 3 / 5; }
+    .bento-topcontinent{ grid-column: 7 / 9; grid-row: 3 / 5; }
+    .bento-furthest    { grid-column: 1 / 5; grid-row: 5 / 7; }
+    .bento-companions  { grid-column: 5 / 9; grid-row: 5 / 7; }
+    .bento-avgtrip     { grid-column: 1 / 5; grid-row: 7 / 8; }
+    .bento-avgkm       { grid-column: 5 / 9; grid-row: 7 / 8; }
 }
 
 /* ===== MOBILE BREAKPOINT ===== */
 /*
-  Mobile layout (4-col, 10-row grid):
-  R1-2: [TRIPS 2x2]    [TRAVELDAYS 2x1]
-  R2:   [TRIPS cont]   [DISTANCE 2x1]
-  R3:   [DAYSSINCE 2x1][LONGEST 2x2]
-  R4:   [FURTHEST 2x1] [LONGEST cont]
-  R5-6: [MONTHLY 4x2 (full width)]
-  R7-8: [MOSTVISITED 2x2] [COMPANIONS 2x2]
-  R9:   [Country 2x1] [Continent 2x1]
-  R10:  [Freq 2x1]    [AvgTrip 2x1]
+  Mobile layout (4-col, 12-row grid):
+  R1-2 : [TRIPS 2×2   ][TRVLDAYS 2×2]
+  R3   : [DIST 2×1    ][FREQ 2×1    ]
+  R4   : [SINCE 2×1   ][CNTRY 2×1   ]
+  R5-6 : [MONTHLY 4×2 full width    ]
+  R7-8 : [LONGEST 2×2 ][FURTHEST 2×2]
+  R9-10: [MOSTVIS 2×2 ][COMP 2×2    ]
+  R11  : [AVGTRIP 2×1 ][AVGKM 2×1   ]
+  R12  : [TOPCONT 4×1 full width    ]
 */
 @media (max-width: 768px) {
-    .header-content { flex-direction: column; text-align: center; }
+    .folder-nav-inner { flex-direction: column; align-items: stretch; padding: 0.5rem 1rem 0; gap: 0; }
+    .folder-nav-brand { padding-bottom: 0.5rem; text-align: center; font-size: 1.1rem; }
+    .folder-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; gap: 2px; }
+    .folder-tabs::-webkit-scrollbar { display: none; }
+    .folder-tab { flex-shrink: 0; padding: 0.5rem 1.1rem; font-size: 0.78rem; }
+    .settings-btn-fixed { bottom: 1rem; left: 1rem; width: 40px; height: 40px; }
+    .year-dropdown-wrapper { bottom: 1rem; right: 1rem; }
+    .year-dropdown-btn { padding: 0.5rem 1rem; font-size: 0.8rem; }
     .form-grid { grid-template-columns: 1fr; }
     .wrapped-card-value { font-size: 2rem; }
     .timeline-months { flex-direction: column; gap: 2rem; }
@@ -332,63 +417,70 @@ textarea { min-height: 100px; resize: vertical; }
 
     .bento-grid {
         grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: repeat(10, minmax(60px, auto));
-        gap: 8px;
+        grid-template-rows: repeat(12, minmax(55px, auto));
+        gap: 6px;
     }
     .bento-trips       { grid-column: 1 / 3; grid-row: 1 / 3; }
-    .bento-traveldays  { grid-column: 3 / 5; grid-row: 1 / 2; }
-    .bento-distance    { grid-column: 3 / 5; grid-row: 2 / 3; }
-    .bento-dayssince   { grid-column: 1 / 3; grid-row: 3 / 4; }
-    .bento-longest     { grid-column: 3 / 5; grid-row: 3 / 5; }
-    .bento-furthest    { grid-column: 1 / 3; grid-row: 4 / 5; }
+    .bento-traveldays  { grid-column: 3 / 5; grid-row: 1 / 3; }
+    .bento-distance    { grid-column: 1 / 3; grid-row: 3 / 4; }
+    .bento-frequency   { grid-column: 3 / 5; grid-row: 3 / 4; }
+    .bento-dayssince   { grid-column: 1 / 3; grid-row: 4 / 5; }
+    .bento-topcountry  { grid-column: 3 / 5; grid-row: 4 / 5; }
     .bento-monthly     { grid-column: 1 / 5; grid-row: 5 / 7; }
-    .bento-mostvisited { grid-column: 1 / 3; grid-row: 7 / 9; }
-    .bento-companions  { grid-column: 3 / 5; grid-row: 7 / 9; }
-    .bento-topcountry  { grid-column: 1 / 3; grid-row: 9 / 10; }
-    .bento-topcontinent{ grid-column: 3 / 5; grid-row: 9 / 10; }
-    .bento-frequency   { grid-column: 1 / 3; grid-row: 10 / 11; }
-    .bento-avgtrip     { grid-column: 3 / 5; grid-row: 10 / 11; }
+    .bento-longest     { grid-column: 1 / 3; grid-row: 7 / 9; }
+    .bento-furthest    { grid-column: 3 / 5; grid-row: 7 / 9; }
+    .bento-mostvisited { grid-column: 1 / 3; grid-row: 9 / 11; }
+    .bento-companions  { grid-column: 3 / 5; grid-row: 9 / 11; }
+    .bento-avgtrip     { grid-column: 1 / 3; grid-row: 11 / 12; }
+    .bento-avgkm       { grid-column: 3 / 5; grid-row: 11 / 12; }
+    .bento-topcontinent{ grid-column: 1 / 5; grid-row: 12 / 13; }
 
     .bento-value-xl { font-size: 2.5rem; }
-    .bento-value-lg { font-size: 1.6rem; }
+    .bento-value-lg { font-size: 1.8rem; }
 }
 
 /* ===== SMALL PHONE BREAKPOINT ===== */
 /*
-  Small phone layout (4-col, 10-row, mostly full-width):
-  R1:   [TRIPS 4x1 (full)]
-  R2:   [TRAVELDAYS 2x1] [DISTANCE 2x1]
-  R3:   [DAYSSINCE 2x1]  [LONGEST 2x1]
-  R4-5: [MONTHLY 4x2 (full)]
-  R6:   [FURTHEST 4x1 (full)]
-  R7:   [MOSTVISITED 4x1 (full)]
-  R8:   [Country 2x1] [Continent 2x1]
-  R9:   [Freq 2x1]    [AvgTrip 2x1]
-  R10:  [COMPANIONS 4x1 (full)]
+  Small phone layout (2-col, 15-row, mostly full-width):
+  R1  : [TRIPS full]
+  R2  : [TRVLDAYS full]
+  R3  : [DISTANCE full]
+  R4  : [FREQ full]
+  R5  : [SINCE full]
+  R6  : [LONGEST full]
+  R7-8: [MONTHLY 2×2 full]
+  R9  : [FURTHEST full]
+  R10 : [MOSTVIS full]
+  R11 : [CNTRY full]
+  R12 : [COMP full]
+  R13 : [AVGTRIP full]
+  R14 : [AVGKM full]
+  R15 : [TOPCONT full]
 */
 @media (max-width: 480px) {
     .bento-grid {
-        grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: repeat(10, minmax(50px, auto));
-        gap: 6px;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(15, minmax(45px, auto));
+        gap: 5px;
     }
-    .bento-trips       { grid-column: 1 / 5; grid-row: 1 / 2; }
+    .bento-trips       { grid-column: 1 / 3; grid-row: 1 / 2; }
     .bento-traveldays  { grid-column: 1 / 3; grid-row: 2 / 3; }
-    .bento-distance    { grid-column: 3 / 5; grid-row: 2 / 3; }
-    .bento-dayssince   { grid-column: 1 / 3; grid-row: 3 / 4; }
-    .bento-longest     { grid-column: 3 / 5; grid-row: 3 / 4; }
-    .bento-monthly     { grid-column: 1 / 5; grid-row: 4 / 6; }
-    .bento-furthest    { grid-column: 1 / 5; grid-row: 6 / 7; }
-    .bento-mostvisited { grid-column: 1 / 5; grid-row: 7 / 8; }
-    .bento-topcountry  { grid-column: 1 / 3; grid-row: 8 / 9; }
-    .bento-topcontinent{ grid-column: 3 / 5; grid-row: 8 / 9; }
-    .bento-frequency   { grid-column: 1 / 3; grid-row: 9 / 10; }
-    .bento-avgtrip     { grid-column: 3 / 5; grid-row: 9 / 10; }
-    .bento-companions  { grid-column: 1 / 5; grid-row: 10 / 11; }
+    .bento-distance    { grid-column: 1 / 3; grid-row: 3 / 4; }
+    .bento-frequency   { grid-column: 1 / 3; grid-row: 4 / 5; }
+    .bento-dayssince   { grid-column: 1 / 3; grid-row: 5 / 6; }
+    .bento-longest     { grid-column: 1 / 3; grid-row: 6 / 7; }
+    .bento-monthly     { grid-column: 1 / 3; grid-row: 7 / 9; }
+    .bento-furthest    { grid-column: 1 / 3; grid-row: 9 / 10; }
+    .bento-mostvisited { grid-column: 1 / 3; grid-row: 10 / 11; }
+    .bento-topcountry  { grid-column: 1 / 3; grid-row: 11 / 12; }
+    .bento-companions  { grid-column: 1 / 3; grid-row: 12 / 13; }
+    .bento-avgtrip     { grid-column: 1 / 3; grid-row: 13 / 14; }
+    .bento-avgkm       { grid-column: 1 / 3; grid-row: 14 / 15; }
+    .bento-topcontinent{ grid-column: 1 / 3; grid-row: 15 / 16; }
 
     .bento-value-xl { font-size: 2rem; }
-    .bento-value-lg { font-size: 1.3rem; }
+    .bento-value-lg { font-size: 1.4rem; }
     .bento-value-sm { font-size: 1rem; }
-    .bento-card { padding: 1rem; }
-    .bento-label { font-size: 0.65rem; }
+    .bento-card { padding: 0.6rem 0.75rem; }
+    .bento-label { font-size: 0.6rem; }
 }

@@ -1,5 +1,280 @@
 # Changelog
 
+## 2026-02-17 — Fix: border wraps content box, tab overlap works
+
+### What changed
+
+Moved the border from `.folder-nav-inner` (flat line across the nav) to `.main-content-bg` (full `border: 1.5px solid` on all sides with `border-radius: 16px`). The content box now looks like an outlined rounded page. Active tabs overlap the content box's top border via `bottom: -1.5px` + `z-index`, creating the seamless "tab opens into page" illusion. Added `margin-top: -1.5px` on content box so its top edge aligns precisely with the tab bottoms.
+
+### Files modified
+
+- `css/styles.css` — `.folder-nav-inner` removed `border-bottom`; `.main-content-bg` added `border`, `margin-top: -1.5px`, `position: relative; z-index: 0`
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Folder-tab polish: header padding, contained border, uniform tab color
+
+### What changed
+
+1. **Header top padding** — increased `padding-top` from `1.25rem` → `1.75rem` for more breathing room above the tabs
+2. **Border wraps content box** — moved `border-bottom` from `.folder-nav` (full viewport) to `.folder-nav-inner` (max-width 1400px), so the line only spans the content area. Cream background visible on sides.
+3. **Content box fully rounded** — `border-radius` changed from `0 0 16px 16px` → `16px` (all corners)
+4. **Uniform active tab color** — all four tabs now share `#F5E6D8` (slightly more saturated than `#FBF0E8`) when active, instead of per-section colors. Content area backgrounds remain section-specific (blue, green, violet, orange).
+
+### Files modified
+
+- `css/styles.css` — `:root` tab variables, `.folder-nav`/`.folder-nav-inner` border move + padding, `.main-content-bg` border-radius
+- `js/app.js` — Tab inline styles switched from `--bg-*` back to `--tab-*`
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Folder-tab refinements: contained box, color updates, padding
+
+### What changed
+
+Visual polish pass on the folder-tab navigation:
+
+1. **More navbar top padding** — `padding-top` from `0.75rem` → `1.25rem` for breathing room
+2. **Content area is now a contained box** — `max-width: 1400px`, centered, with `border-radius: 0 0 16px 16px` and subtle box-shadow. Cream (`--light`) background is visible on the sides, making the content look like a physical page inside a folder.
+3. **Tab color = content background** — Active tabs now use the light page tint (not the saturated accent), so the tab seamlessly merges into the content area as one continuous surface.
+4. **Color palette update:**
+   - Trips: warm yellow → **light blue** (`#E8F0FA`)
+   - Timeline: sage green → **light violet** (`#F0ECF5`)
+   - Map: green unchanged (`#EFF5F3`)
+   - Dashboard: orange unchanged (`#FBF0E8`)
+
+### Files modified
+
+- `css/styles.css` — Updated `:root` variables, `.folder-nav-inner` padding, `.main-content-bg` containment
+- `js/app.js` — Tab inline styles changed from `--tab-*` to `--bg-*`
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Menu redesign: folder-tab navigation
+
+### What changed
+
+Replaced the dark teal sticky header with a folder-tab navigation system inspired by physical manila folder dividers. Each tab visually merges into its section's content area below.
+
+### Navigation structure
+
+- **Top-left:** "Nomad Atlas" logo placeholder (text, ready for future logo image)
+- **Top-right:** 4 folder tabs in order: **Trips | Map | Timeline | Dashboard**
+- **Bottom-left (fixed):** Settings gear button (SVG icon, circular)
+- **Bottom-right (fixed):** Year selector dropdown (pill button with chevron)
+
+### Tab behavior
+
+Active tab takes the section's theme color and seamlessly connects to the content area below (no bottom border, overlaps the nav's border line). Inactive tabs appear in muted cream.
+
+| Tab | Active Color | Content Background |
+|---|---|---|
+| Trips | `#E8C468` (golden yellow) | `#FBF4E0` (light warm yellow) |
+| Map | `#89ACA4` (teal sage) | `#EFF5F3` (light teal wash) |
+| Timeline | `#B7C4A1` (sage green) | `#F2F5ED` (light sage wash) |
+| Dashboard | `#D4956A` (burnt orange) | `#FBF0E8` (light warm peach) |
+
+### Removed from navigation
+
+- **Wrapped tab:** hidden (component remains in codebase for future use)
+- **Settings tab:** moved to fixed bottom-left gear button
+- **Year selector bar:** replaced by bottom-right dropdown
+- **All emoji labels** in nav tabs (per design brief: no emojis)
+
+### New CSS variables
+
+`--tab-trips`, `--tab-map`, `--tab-timeline`, `--tab-dashboard`, `--bg-trips`, `--bg-map`, `--bg-timeline`, `--bg-dashboard`, `--bg-settings`
+
+### Responsive breakpoints
+
+- **Desktop:** Logo left, tabs right in single row
+- **Tablet (1024px):** Slightly smaller tabs
+- **Mobile (768px):** Nav stacks vertically, tabs horizontally scrollable
+
+### Files modified
+
+- `css/styles.css` — New folder-tab classes, settings button, year dropdown, section color variables, responsive rules; old header/nav-tab hidden
+- `js/app.js` — Rewrote App render (folder nav, settings button, year dropdown, dynamic content backgrounds), removed wrapped from nav, changed default tab to trips
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Dashboard reorganization: 10×6 grid, Exo 2 font, new card
+
+### What changed
+
+Reorganized the entire bento grid to a 10-column × 6-row layout based on a user-provided color-block diagram. Added a new "Avg km/trip" metric card. Switched number font to Exo 2 Bold.
+
+### Typography
+
+- **Numbers / headings:** Exo 2 Bold 700 (was Space Grotesk 700) — geometric, bold, modern
+- **Labels / body:** Outfit stays unchanged
+
+### New card
+
+- **Avg km/trip** (`.bento-avgkm`) — violet `#A89ABD` background, computes `totalKm / totalTrips`
+
+### Layout changes (desktop — 10-col × 6-row)
+
+| Card | Before | After | Change |
+|---|---|---|---|
+| Trips | 2×1 | 2×2 | Bigger, value-xl |
+| Travel Days | 2×1 | 2×2 | Bigger, value-xl |
+| Distance | 2×1 | 2×2 | Bigger, value-xl |
+| Frequency | 2×1 | 2×2 | Bigger, value-xl |
+| Days Since | 4×2 | 2×1 | Smaller, value-lg |
+| Most Visited | 2×2 | 2×2 | Same |
+| Longest | 4×1 | 3×2 | Taller, column layout |
+| Monthly Chart | 4×2 | 5×2 | Wider |
+| Top Country | 2×1 | 2×2 | Bigger |
+| Furthest | 4×2 | 3×2 | Narrower |
+| Avg Trip | 2×1 | 2×1 | Same |
+| Avg km/trip | — | 2×1 | NEW |
+| Companions | 4×1 | 3×2 | Taller, column layout |
+| Top Continent | 2×1 | 2×1 | Same |
+
+### Responsive breakpoints
+
+- **Tablet (1024px):** 8-col × 7-row grid
+- **Mobile (768px):** 4-col × 12-row grid
+- **Small phone (480px):** 2-col × 15-row (all full-width stacked)
+
+### Files modified
+
+- `index.html` — Google Fonts import (Exo 2)
+- `css/styles.css` — Grid, placements, card overrides, text selectors, 3 breakpoints
+- `js/app.js` — avgKmPerTrip computation, new card, value class changes
+
+---
+
+## 2026-02-16 — Dashboard density & typography refinement
+
+### What changed
+
+Compacted the bento grid layout from 6 rows to 5 rows, swapped fonts, and mixed card sizes for a more dynamic visual rhythm.
+
+### Typography
+
+- **Numbers / headings:** Space Grotesk 700 (was DM Sans 800) — geometric, bold, Grotesk-family
+- **Labels / body:** Outfit 300-500 (was Inter 400-600) — clean, slightly rounded, Neue Montreal alternative
+- Replaced all font references across the entire CSS
+
+### Layout changes (desktop)
+
+**From 6-row to 5-row grid** (`minmax(80px, 1fr)` → `minmax(70px, auto)`, gap `10px` → `8px`):
+
+| Card | Before | After | Change |
+|---|---|---|---|
+| Travel Days | 2x2 | 2x1 | Shrunk — only number+label |
+| Distance | 2x2 | 2x1 | Shrunk |
+| Days Since | 2x2 | 2x1 | Shrunk |
+| Most Visited | 2x3 | 2x2 | Shrunk — tighter list gaps |
+| Furthest | 4x2 | 6x1 | Wider but shorter, horizontal layout |
+| Frequency | 2x2 | 2x1 | Shrunk |
+| Avg Trip | 4x2 | 2x1 | Shrunk — was massively oversized |
+| Trips | 2x2 | 2x2 | Kept (hero stat) |
+| Longest | 4x2 | 4x2 | Kept (sub-details) |
+| Monthly Chart | 6x2 | 6x2 | Kept (chart) |
+| Companions | 4x2 | 4x2 | Kept (people list) |
+
+New grid:
+```
+R1  : [TRIPS 2x2] [Days 2x1] [Since 2x1] [Dist 2x1] [LONGEST 4x2]
+R2  : [TRIPS cnt] [──────── Furthest 6x1 ──────────] [LONGEST cnt ]
+R3-4: [MOSTVIS 2x2] [── MONTHLY 6x2 ─────────────] [COMP 4x2   ]
+R5  : [Cnt][Cont] [Freq 2x1] [Avg 2x1]
+```
+
+### Padding & sizing
+
+- Card padding: `1.25rem` → `0.75rem 1rem`
+- `.bento-value-lg`: `2.2rem` → `2.8rem` (bigger numbers in compact cards)
+- `.bento-sub`: `0.75rem` → `0.85rem` (bigger text on rich-content cards)
+- `.bento-label` margin-top: `0.35rem` → `0.15rem`
+- Companions list gap/margin tightened
+
+### Responsive breakpoints
+
+- Tablet (1024px): reduced from 7 to 5 rows
+- Mobile (768px): reduced from 10 to 9 rows, tighter gaps
+- Small phone (480px): tighter padding and gaps, proportional
+
+### What did NOT change
+
+- Card colors and accent backgrounds preserved
+- All functionality unchanged
+- No new cards or removed cards
+
+### Files modified
+
+- `index.html` — Google Fonts import (Space Grotesk + Outfit)
+- `css/styles.css` — Grid layout, typography, padding, all breakpoints
+- `CHANGELOG.md`
+
+## 2026-02-15 — Color palette and typography overhaul
+
+### What changed
+
+Applied a warm, earthy color system and modern typography across the entire app. Layout and card structure remain untouched — this is a purely visual (color + type) update.
+
+### Color palette
+
+- **Page background:** `#F5EDE3` (warm cream)
+- **Card surfaces:** `#FEFCF9` (soft warm white, used for non-dashboard cards/modals)
+- **Text primary:** `#2C2C2C` (near-black for dominant numbers)
+- **Text secondary:** `#6B6259` (warm gray for labels)
+- **Text muted:** `#9A9088` (lighter warm gray for sub-details)
+
+### Bento card accent colors (each section has its own background)
+
+| Card | Color | Hex |
+|---|---|---|
+| Trips | Warm mustard | `#E8C468` |
+| Travel Days | Dusty sage | `#B7C4A1` |
+| Distance | Soft terracotta | `#D4956A` |
+| Days Since | Muted teal | `#89ACA4` |
+| Longest Trip | Warm peach | `#E8C9AB` |
+| Monthly Chart | Warm white | `#FEFCF9` |
+| Furthest Dest | Dusty rose | `#C9A09A` |
+| Most Visited | Olive | `#8B9A6D` |
+| Top Country | Warm sand | `#D9C4A0` |
+| Top Continent | Slate sage | `#7D9590` |
+| Frequency | Faded clay | `#C4A882` |
+| Avg Trip | Soft blue-gray | `#A3B1B8` |
+| Companions | Warm linen | `#DDD0C0` |
+
+### Typography
+
+- **Numbers / headings:** DM Sans (800 weight) — modern, geometric, slightly rounded
+- **Labels / body:** Inter (400-600) — clean, legible secondary face
+- Replaced Playfair Display (serif) and Work Sans throughout
+- Numbers are large + bold as the dominant visual element; labels are small, uppercase, tracked
+
+### Other visual changes
+
+- Removed 2px solid borders from all cards (bento, metric, trip list, timeline, modals)
+- Softened box-shadows across all components
+- Updated header gradient to warmer teal (`#3D6B5E` to `#2A5448`)
+- Updated year-chip active state to terracotta
+- Updated chart line/dot colors to match palette
+- Applied warm white (`#FEFCF9`) to all card/panel surfaces
+
+### What did NOT change
+
+- Zero layout changes — bento grid placement, card sizes, responsive breakpoints all preserved
+- Zero functionality changes — all interactions, data, CRUD operations unchanged
+- No illustrations added
+
+### Files modified
+
+- `index.html` — Updated Google Fonts import (DM Sans + Inter, removed Playfair Display + Work Sans)
+- `css/styles.css` — Full color and typography update across all components
+- `js/app.js` — Updated SVG chart line/dot colors
+- `CHANGELOG.md`
+
 ## 2026-02-13 — Dashboard bento-grid layout redesign
 
 ### What changed

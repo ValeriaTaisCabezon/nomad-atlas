@@ -895,6 +895,8 @@ const DashboardView = ({ trips, homeCoords }) => {
         });
     }
 
+    const avgKmPerTrip = totalTrips > 0 ? Math.round(totalKm / totalTrips) : 0;
+
     // Days since last trip
     const sortedByDate = [...trips].sort((a, b) => new Date(b.fechaFinal || b.fechaInicio) - new Date(a.fechaFinal || a.fechaInicio));
     const lastTripEnd = sortedByDate[0] ? new Date(sortedByDate[0].fechaFinal || sortedByDate[0].fechaInicio) : null;
@@ -969,15 +971,20 @@ const DashboardView = ({ trips, homeCoords }) => {
                 h('div', {className: 'bento-label'}, 'Viajes')
             ),
 
-            /* === ROW 1 CENTER: 3 small cards stacked horizontally === */
+            /* === R1-2: TravelDays, Distance, Frequency (2×2 each) + DaysSince (2×1) === */
             h('div', {className: 'bento-card bento-traveldays'},
-                h('div', {className: 'bento-value-lg'}, totalDays),
+                h('div', {className: 'bento-value-xl'}, totalDays),
                 h('div', {className: 'bento-label'}, 'Dias viajando')
             ),
 
             h('div', {className: 'bento-card bento-distance'},
-                h('div', {className: 'bento-value-lg'}, Math.round(totalKm).toLocaleString()),
+                h('div', {className: 'bento-value-xl'}, Math.round(totalKm).toLocaleString()),
                 h('div', {className: 'bento-label'}, 'Km recorridos')
+            ),
+
+            h('div', {className: 'bento-card bento-frequency'},
+                h('div', {className: 'bento-value-xl'}, tripsPerMonth),
+                h('div', {className: 'bento-label'}, 'Viajes/mes')
             ),
 
             h('div', {className: 'bento-card bento-dayssince'},
@@ -985,7 +992,7 @@ const DashboardView = ({ trips, homeCoords }) => {
                 h('div', {className: 'bento-label'}, 'Dias desde ultimo viaje')
             ),
 
-            /* === ROW 1-2 RIGHT: LONGEST TRIP (4col x 2row) === */
+            /* === R3-4 LEFT: LONGEST TRIP (3×2) === */
             h('div', {className: 'bento-card bento-longest'},
                 h('div', {className: 'bento-value-xl'}, longestTrip.days, 'd'),
                 h('div', {className: 'bento-label'}, 'Viaje mas largo'),
@@ -993,14 +1000,14 @@ const DashboardView = ({ trips, homeCoords }) => {
                 h('div', {className: 'bento-sub'}, longestPct, '% del año')
             ),
 
-            /* === ROW 3-4 CENTER: TRAVELED MONTHS (4col x 2row) === */
+            /* === R3-4 CENTER: TRAVELED MONTHS (5×2) === */
             h('div', {className: 'bento-card bento-monthly'},
                 h('div', {className: 'bento-label'}, 'Meses viajados'),
                 h('div', {className: 'bento-chart-area'},
                     h('svg', {viewBox: '0 0 100 40', className: 'bento-line-svg', preserveAspectRatio: 'none'},
-                        h('polyline', {points: linePoints, fill: 'none', stroke: '#999', strokeWidth: '1.5', strokeLinejoin: 'round', strokeLinecap: 'round'}),
+                        h('polyline', {points: linePoints, fill: 'none', stroke: '#6B6259', strokeWidth: '1.5', strokeLinejoin: 'round', strokeLinecap: 'round'}),
                         monthCounts.map((c, i) => (
-                            h('circle', {key: i, cx: (i / 11) * chartW, cy: maxMonth > 0 ? chartH - (c / maxMonth) * chartH : chartH, r: '1.5', fill: '#666'})
+                            h('circle', {key: i, cx: (i / 11) * chartW, cy: maxMonth > 0 ? chartH - (c / maxMonth) * chartH : chartH, r: '1.5', fill: '#D4956A'})
                         ))
                     ),
                     h('div', {className: 'bento-chart-labels'},
@@ -1009,7 +1016,7 @@ const DashboardView = ({ trips, homeCoords }) => {
                 )
             ),
 
-            /* === ROW 3-4 RIGHT: FURTHEST DEST (4col x 2row) === */
+            /* === R5-6 LEFT: FURTHEST DEST (3×2) === */
             h('div', {className: 'bento-card bento-furthest'},
                 h('div', {className: 'bento-value-xl'}, furthest.km > 0 ? Math.round(furthest.km).toLocaleString() : '-'),
                 h('div', {className: 'bento-label'}, 'Destino mas lejano'),
@@ -1017,7 +1024,7 @@ const DashboardView = ({ trips, homeCoords }) => {
                 furthest.km > 0 && h('div', {className: 'bento-sub'}, worldLaps, 'x vuelta al mundo')
             ),
 
-            /* === ROW 3-5 LEFT: MOST VISITED DESTINATIONS (2col x 3row) === */
+            /* === R2-3 RIGHT: MOST VISITED DESTINATIONS (2×2) === */
             h('div', {className: 'bento-card bento-mostvisited'},
                 h('div', {className: 'bento-label'}, 'Destinos mas visitados'),
                 h('div', {className: 'bento-top-list'},
@@ -1030,29 +1037,25 @@ const DashboardView = ({ trips, homeCoords }) => {
                 )
             ),
 
-            /* === ROW 6 LEFT: Top country + Top continent (1col each) === */
+            /* === R4-5 RIGHT: Top Country (2×2) === */
             h('div', {className: 'bento-card bento-topcountry'},
                 h('div', {className: 'bento-value-sm'}, topCountry ? topCountry[0] : '-'),
                 h('div', {className: 'bento-label'}, 'Top pais')
             ),
 
-            h('div', {className: 'bento-card bento-topcontinent'},
-                h('div', {className: 'bento-value-sm'}, topContinent ? topContinent[0] : '-'),
-                h('div', {className: 'bento-label'}, 'Top continente')
-            ),
-
-            /* === ROW 5-6 CENTER: Travel frequency + Avg trip length === */
-            h('div', {className: 'bento-card bento-frequency'},
-                h('div', {className: 'bento-value-lg'}, tripsPerMonth),
-                h('div', {className: 'bento-label'}, 'Viajes/mes')
-            ),
-
+            /* === R5: Avg Trip (2×1) === */
             h('div', {className: 'bento-card bento-avgtrip'},
                 h('div', {className: 'bento-value-lg'}, avgTripLength, 'd'),
                 h('div', {className: 'bento-label'}, 'Promedio dias/viaje')
             ),
 
-            /* === ROW 3-6 RIGHT: TOP COMPANIONS (4col x tall) === */
+            /* === R6: Avg km/trip (2×1) — NEW === */
+            h('div', {className: 'bento-card bento-avgkm'},
+                h('div', {className: 'bento-value-lg'}, avgKmPerTrip.toLocaleString()),
+                h('div', {className: 'bento-label'}, 'Promedio km/viaje')
+            ),
+
+            /* === R5-6 CENTER: COMPANIONS (3×2) === */
             h('div', {className: 'bento-card bento-companions'},
                 h('div', {className: 'bento-label'}, 'Top compañeros'),
                 h('div', {className: 'bento-companions-list'},
@@ -1069,6 +1072,12 @@ const DashboardView = ({ trips, homeCoords }) => {
                     )),
                     topCompanions.length === 0 && h('div', {className: 'bento-sub'}, 'Sin compañeros registrados')
                 )
+            ),
+
+            /* === R6 RIGHT: Top Continent (2×1) === */
+            h('div', {className: 'bento-card bento-topcontinent'},
+                h('div', {className: 'bento-value-sm'}, topContinent ? topContinent[0] : '-'),
+                h('div', {className: 'bento-label'}, 'Top continente')
             )
         )
     );
@@ -1159,7 +1168,9 @@ const TripsListView = ({ trips, onTripClick, onEditTrip, onDeleteTrip }) => {
 };
 
 const App = () => {
-    const [activeTab, setActiveTab] = useState('settings');
+    const [activeTab, setActiveTab] = useState('trips');
+    const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+    const yearDropdownRef = useRef(null);
     const [trips, setTrips] = useState([]);
     const [profile, setProfile] = useState(null);
     const [homeCoords, setHomeCoords] = useState(null);
@@ -1198,7 +1209,7 @@ const App = () => {
                         if (coords) setHomeCoords(coords);
                     });
                 }
-                setActiveTab('map');
+                setActiveTab('trips');
             }
             catch (e) { console.error('Error loading profile:', e); }
         }
@@ -1215,6 +1226,27 @@ const App = () => {
             }
         }
     }, [profile]);
+
+    // Close year dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (yearDropdownRef.current && !yearDropdownRef.current.contains(e.target)) {
+                setYearDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const getContentBg = () => {
+        const bgMap = { trips: 'var(--bg-trips)', map: 'var(--bg-map)', timeline: 'var(--bg-timeline)', dashboard: 'var(--bg-dashboard)', settings: 'var(--bg-settings)' };
+        return bgMap[activeTab] || 'var(--light)';
+    };
+
+    const getTabColor = () => {
+        const tabMap = { trips: 'var(--tab-trips)', map: 'var(--tab-map)', timeline: 'var(--tab-timeline)', dashboard: 'var(--tab-dashboard)' };
+        return tabMap[activeTab] || '#EDE5DB';
+    };
 
     const handleAddTrip = (trip) => {
         if (editingTrip) {
@@ -1347,62 +1379,115 @@ const App = () => {
 
     return (
         h('div', {className: 'app-container'},
-            h('header', {className: 'header'},
-                h('div', {className: 'header-content'},
-                    h('h1', {className: 'logo'}, 'Nomad Atlas'),
-                    h('nav', {className: 'nav-tabs'},
-                        h('button', {className: `nav-tab ${activeTab === 'map' ? 'active' : ''}`, onClick: () => setActiveTab('map'), disabled: !profile}, '🗺️ Mapa'),
-                        h('button', {className: `nav-tab ${activeTab === 'trips' ? 'active' : ''}`, onClick: () => setActiveTab('trips'), disabled: !profile}, '✈️ Viajes', filteredTrips.length > 0 ? ' (' + filteredTrips.length + ')' : ''),
-                        h('button', {className: `nav-tab ${activeTab === 'timeline' ? 'active' : ''}`, onClick: () => setActiveTab('timeline'), disabled: !profile}, '📅 Timeline'),
-                        h('button', {className: `nav-tab ${activeTab === 'dashboard' ? 'active' : ''}`, onClick: () => setActiveTab('dashboard'), disabled: !profile}, '📊 Dashboard'),
-                        h('button', {className: `nav-tab ${activeTab === 'wrapped' ? 'active' : ''}`, onClick: () => setActiveTab('wrapped'), disabled: !profile}, '🎁 Wrapped'),
-                        h('button', {className: `nav-tab ${activeTab === 'settings' ? 'active' : ''}`, onClick: () => setActiveTab('settings')}, '⚙️ Ajustes')
+            // ===== FOLDER-TAB NAVIGATION =====
+            h('nav', {className: 'folder-nav'},
+                h('div', {className: 'folder-nav-inner'},
+                    // Logo placeholder (top-left)
+                    h('span', {className: 'folder-nav-brand'}, 'Nomad Atlas'),
+                    // Folder tabs (right)
+                    h('div', {className: 'folder-tabs'},
+                        h('button', {
+                            className: 'folder-tab' + (activeTab === 'trips' ? ' active' : ''),
+                            onClick: () => setActiveTab('trips'),
+                            disabled: !profile,
+                            style: activeTab === 'trips' ? {background: 'var(--tab-trips)'} : {}
+                        }, 'Trips'),
+                        h('button', {
+                            className: 'folder-tab' + (activeTab === 'map' ? ' active' : ''),
+                            onClick: () => setActiveTab('map'),
+                            disabled: !profile,
+                            style: activeTab === 'map' ? {background: 'var(--tab-map)'} : {}
+                        }, 'Map'),
+                        h('button', {
+                            className: 'folder-tab' + (activeTab === 'timeline' ? ' active' : ''),
+                            onClick: () => setActiveTab('timeline'),
+                            disabled: !profile,
+                            style: activeTab === 'timeline' ? {background: 'var(--tab-timeline)'} : {}
+                        }, 'Timeline'),
+                        h('button', {
+                            className: 'folder-tab' + (activeTab === 'dashboard' ? ' active' : ''),
+                            onClick: () => setActiveTab('dashboard'),
+                            disabled: !profile,
+                            style: activeTab === 'dashboard' ? {background: 'var(--tab-dashboard)'} : {}
+                        }, 'Dashboard')
                     )
                 )
             ),
 
-            h('main', {className: 'main-content'},
-                profile && availableYears.length > 0 && (
-                    h('div', {className: 'year-selector-bar'},
-                        h('span', {style: {fontWeight: '700', color: 'var(--secondary)', fontSize: '0.9rem'}}, '📅 A\u00f1o:'),
-                        h('button', {className: `year-chip ${selectedYear === 'all' ? 'active' : ''}`, onClick: () => setSelectedYear('all')}, 'Todos'),
-                        availableYears.map(y => (
-                            h('button', {key: y, className: `year-chip ${selectedYear === String(y) ? 'active' : ''}`, onClick: () => setSelectedYear(String(y))}, y)
-                        ))
+            // ===== CONTENT AREA with dynamic background =====
+            h('div', {className: 'main-content-bg', style: {backgroundColor: getContentBg()}},
+                h('main', {className: 'main-content'},
+
+                    activeTab === 'settings' && (
+                        h(React.Fragment, null,
+                            h(ProfileView, {profile: profile, onUpdateProfile: handleUpdateProfile}),
+                            profile && h(DataManagementPanel, {trips: trips, lastImportDate: lastImportDate, onExportJSON: handleExportJSON, onExportCSV: handleExportCSV, onImportJSON: handleImportJSON, onClearAll: handleClearAllData})
+                        )
+                    ),
+
+                    activeTab === 'map' && profile && (
+                        h('div', {className: 'map-container'}, h(MapView, {trips: filteredTrips, homeCoords: homeCoords, onTripClick: setSelectedTrip}))
+                    ),
+
+                    activeTab === 'trips' && profile && (
+                        h(React.Fragment, null,
+                            h('div', {style: {display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}},
+                                h('button', {className: 'btn-primary', onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }},
+                                    showAddForm ? '\u2715 Cerrar Formulario' : '+ Nuevo Viaje'
+                                )
+                            ),
+                            (showAddForm || editingTrip) && (
+                                h(AddTripForm, {onAddTrip: (trip) => { handleAddTrip(trip); setShowAddForm(false); }, allPeople: allPeople, allDestinations: allDestinations, editingTrip: editingTrip, onCancelEdit: () => { setEditingTrip(null); setShowAddForm(false); }, existingTrips: trips, showToast: showToast, onImportTrips: handleImportTrips})
+                            ),
+                            h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip})
+                        )
+                    ),
+
+                    activeTab === 'timeline' && profile && h(TimelineView, {trips: filteredTrips, onTripClick: setSelectedTrip}),
+
+                    activeTab === 'dashboard' && profile && h(DashboardView, {trips: filteredTrips, homeCoords: homeCoords})
+                )
+            ),
+
+            // ===== SETTINGS BUTTON (fixed bottom-left) =====
+            h('button', {
+                className: 'settings-btn-fixed' + (activeTab === 'settings' ? ' active' : ''),
+                onClick: () => setActiveTab('settings'),
+                title: 'Settings'
+            },
+                h('svg', {width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round'},
+                    h('circle', {cx: 12, cy: 12, r: 3}),
+                    h('path', {d: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'})
+                )
+            ),
+
+            // ===== YEAR DROPDOWN (fixed bottom-right) =====
+            profile && availableYears.length > 0 && (
+                h('div', {className: 'year-dropdown-wrapper', ref: yearDropdownRef},
+                    h('button', {
+                        className: 'year-dropdown-btn' + (yearDropdownOpen ? ' open' : ''),
+                        onClick: () => setYearDropdownOpen(!yearDropdownOpen)
+                    },
+                        h('span', null, selectedYear === 'all' ? 'All Years' : selectedYear),
+                        h('svg', {width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'},
+                            h('polyline', {points: '6 9 12 15 18 9'})
+                        )
+                    ),
+                    yearDropdownOpen && (
+                        h('div', {className: 'year-dropdown-menu'},
+                            h('button', {
+                                className: 'year-dropdown-item' + (selectedYear === 'all' ? ' active' : ''),
+                                onClick: () => { setSelectedYear('all'); setYearDropdownOpen(false); }
+                            }, 'All Years'),
+                            availableYears.map(y => (
+                                h('button', {
+                                    key: y,
+                                    className: 'year-dropdown-item' + (selectedYear === String(y) ? ' active' : ''),
+                                    onClick: () => { setSelectedYear(String(y)); setYearDropdownOpen(false); }
+                                }, y)
+                            ))
+                        )
                     )
-                ),
-
-                activeTab === 'settings' && (
-                    h(React.Fragment, null,
-                        h(ProfileView, {profile: profile, onUpdateProfile: handleUpdateProfile}),
-                        profile && h(DataManagementPanel, {trips: trips, lastImportDate: lastImportDate, onExportJSON: handleExportJSON, onExportCSV: handleExportCSV, onImportJSON: handleImportJSON, onClearAll: handleClearAllData})
-                    )
-                ),
-
-                activeTab === 'map' && profile && (
-                    h('div', {className: 'map-container'}, h(MapView, {trips: filteredTrips, homeCoords: homeCoords, onTripClick: setSelectedTrip}))
-                ),
-
-                activeTab === 'trips' && profile && (
-                    h(React.Fragment, null,
-                        h('div', {style: {display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}},
-                            h('button', {className: 'btn-primary', onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }},
-                                showAddForm ? '✕ Cerrar Formulario' : '➕ Nuevo Viaje'
-                            )
-                        ),
-                        (showAddForm || editingTrip) && (
-                            h(AddTripForm, {onAddTrip: (trip) => { handleAddTrip(trip); setShowAddForm(false); }, allPeople: allPeople, allDestinations: allDestinations, editingTrip: editingTrip, onCancelEdit: () => { setEditingTrip(null); setShowAddForm(false); }, existingTrips: trips, showToast: showToast, onImportTrips: handleImportTrips})
-                        ),
-                        h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip})
-                    )
-                ),
-
-                activeTab === 'timeline' && profile && h(TimelineView, {trips: filteredTrips, onTripClick: setSelectedTrip}),
-
-                activeTab === 'dashboard' && profile && h(DashboardView, {trips: filteredTrips, homeCoords: homeCoords}),
-
-                activeTab === 'wrapped' && profile && (
-                    h(WrappedView, {trips: filteredTrips, selectedYear: selectedYear})
                 )
             ),
 
