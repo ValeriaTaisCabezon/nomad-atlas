@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-02-18 — Trip name as primary identifier; destinations as subtitle
+
+### What changed
+
+Restructured the trip data model so users give each trip a **custom name** (e.g. "Summer Beach Trip") and destinations become secondary metadata shown as a subtitle.
+
+### Data model
+
+- `trip_name` field is now the primary identifier for every trip
+- `destinations` (the `destinos` array) stores per-place data with optional dates and photos as before
+- `dbToTrip` now reads `trip_name` from Supabase rows
+- `tripToDb` writes the explicit `trip_name` from the form (falls back to joined destinations only when blank)
+- New helpers `getTripName(trip)` and `formatDestinations(destinos)` centralise display logic
+
+### Form changes (`AddTripForm`)
+
+- **"Nombre del viaje \*"** — new required text input, shown prominently at the top of the form (larger label, `1.05rem` font)
+- **"Destinos"** — new comma-separated quick-entry field below the name (`"París, Londres, Roma"` → three DestinoCard stubs created automatically)
+- Quick-entry and DestinoCards are kept in sync: editing a card updates the text field; removing a card removes it from the text field; clicking a saved-destination chip appends to the text field
+- Form now validates that `trip_name` is non-empty before submitting
+
+### Display changes
+
+| Location | Before | After |
+|---|---|---|
+| Carousel collapsed card | destinations as title | `trip_name` as title + destinations as subtitle below |
+| Carousel expanded card | destinations as title | `trip_name` as title + destinations as subtitle |
+| Trip detail modal | destinations as `<h2>` | `trip_name` as `<h2>` + destinations in muted line below |
+| Timeline mini card | destinations joined | `trip_name` + destinations subtitle |
+| Map popup | destinations joined | `trip_name` bold + destinations muted |
+| TripCard (list) | destinations as `<h3>` | `trip_name` as `<h3>` + destinations muted |
+| Dashboard longest trip | destinations joined | `trip_name` |
+
+### Migration (one-time, automatic)
+
+- On first load after this update, any trip with a null/empty `trip_name` in Supabase is back-filled
+- Generated name = destinations joined with ` → ` (e.g. `"Bariloche → San Martín → Pampa Linda"`)
+- Migration flag stored in `localStorage` as `nomadAtlas_tripname_migrated_<userId>`; runs once per user then never again
+- Console logs each updated trip: `[Migration] Trip <id>: trip_name set to "..."`
+
+### CSV changes
+
+- **Export header:** `tripName` added as first column → `tripName,tripId,tripFechaInicio,...`
+- **Import:** reads `tripName` / `trip_name` / `nombre` column if present; backwards compatible (old CSVs without the column still import cleanly, with `trip_name` left blank and back-filled from destinations)
+- Import preview table now shows a "Nombre" column
+
+### New CSS rules (`styles.css`)
+
+- `.carousel-card__subtitle` — destinations subtitle on collapsed card (white, 0.72rem, 65% opacity, single line clamp)
+- `.carousel-exp__subtitle` — destinations subtitle in expanded panel (muted, 0.78rem, single line clamp)
+
+### Files modified
+
+- `js/app.js` — `getTripName`, `formatDestinations` helpers; `dbToTrip`/`tripToDb`; `AddTripForm` state + render; migration block; all display locations; CSV export/import
+- `css/styles.css` — `.carousel-card__subtitle`, `.carousel-exp__subtitle`
+- `CHANGELOG.md`
+
+---
+
 ## 2026-02-18 — Supabase auth setup (no data migration)
 
 ### What changed

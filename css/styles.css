@@ -356,6 +356,16 @@ textarea { min-height: 100px; resize: vertical; }
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+.carousel-card__subtitle {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.65);
+    font-weight: 400;
+    margin-bottom: 0.25rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 .carousel-card__date {
     font-size: 0.78rem;
     color: rgba(255,255,255,0.75);
@@ -420,6 +430,17 @@ textarea { min-height: 100px; resize: vertical; }
     -webkit-box-orient: vertical;
     overflow: hidden;
     flex-shrink: 0;
+}
+.carousel-exp__subtitle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: -0.15rem;
+    margin-bottom: 0.25rem;
+    flex-shrink: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 .carousel-exp__date {
     display: flex;

@@ -153,6 +153,17 @@ const deletePhotosFromStorage = async (trip) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Format destinations array into "Paris → London → Rome" subtitle
+const formatDestinations = (destinos) => {
+    if (!destinos || destinos.length === 0) return '';
+    return destinos.map(d => d.lugar.split(',')[0].trim()).join(' \u2192 ');
+};
+
+// Get the display name (trip_name, or fall back to joined destinations)
+const getTripName = (trip) => {
+    return (trip.trip_name || '').trim() || formatDestinations(trip.destinos) || 'Viaje sin nombre';
+};
+
 const formatDateRange = (startDate, endDate) => {
     if (!startDate) return '';
     const opts = { day: 'numeric', month: 'short' };
@@ -230,6 +241,7 @@ const parseCSVRows = (text) => {
         try {
             const values = parseCSVField(lines[i]);
             if (values.length < 4) { errors.push({ row: i + 1, message: 'Muy pocas columnas' }); continue; }
+            const tripName = getCol(values, 'tripname', 'trip_name', 'nombre') || '';
             const tripId = getCol(values, 'tripid') || null;
             const fechaInicio = getCol(values, 'tripfechainicio', 'fechainicio');
             const fechaFinal = getCol(values, 'tripfechafinal', 'fechafinal') || fechaInicio;
@@ -241,14 +253,14 @@ const parseCSVRows = (text) => {
             const destFechaFinal = getCol(values, 'destfechafinal', 'destinofechafinal') || fechaFinal;
             if (!fechaInicio) { errors.push({ row: i + 1, message: 'Falta fecha de inicio' }); continue; }
             if (!lugar) { errors.push({ row: i + 1, message: 'Falta lugar/destino' }); continue; }
-            rawEntries.push({ tripId, fechaInicio, fechaFinal, motivo, personas: personas ? personas.split(';').map(n => ({ nombre: n.trim(), foto: null })).filter(p => p.nombre) : [], notas, lugar, destFechaInicio, destFechaFinal, sourceRow: i + 1 });
+            rawEntries.push({ tripName, tripId, fechaInicio, fechaFinal, motivo, personas: personas ? personas.split(';').map(n => ({ nombre: n.trim(), foto: null })).filter(p => p.nombre) : [], notas, lugar, destFechaInicio, destFechaFinal, sourceRow: i + 1 });
         } catch (e) { errors.push({ row: i + 1, message: 'Error de parseo: ' + e.message }); }
     }
     const tripMap = new Map();
     rawEntries.forEach(entry => {
         const groupKey = entry.tripId || entry.fechaInicio;
         if (!tripMap.has(groupKey)) {
-            tripMap.set(groupKey, { id: Date.now() + Math.floor(Math.random() * 10000), fechaInicio: entry.fechaInicio, fechaFinal: entry.fechaFinal, motivo: entry.motivo, personas: entry.personas, destinos: [], notas: entry.notas, createdAt: new Date().toISOString() });
+            tripMap.set(groupKey, { id: Date.now() + Math.floor(Math.random() * 10000), trip_name: entry.tripName || '', fechaInicio: entry.fechaInicio, fechaFinal: entry.fechaFinal, motivo: entry.motivo, personas: entry.personas, destinos: [], notas: entry.notas, createdAt: new Date().toISOString() });
         }
         const trip = tripMap.get(groupKey);
         trip.destinos.push({ lugar: entry.lugar, fechaInicio: entry.destFechaInicio, fechaFinal: entry.destFechaFinal, foto: null, coordinates: null });
@@ -353,7 +365,8 @@ const TripCard = ({ trip, onClick, showEditButton, onEdit, onDelete }) => {
             h('div', {onClick: onClick},
                 firstDestino?.foto && h('img', {src: firstDestino.foto, alt: firstDestino.lugar, className: 'trip-list-card-image'}),
                 h('div', {className: 'trip-list-card-content'},
-                    h('h3', {className: 'trip-list-card-title'}, trip.destinos.map(d => d.lugar).join(' → ')),
+                    h('h3', {className: 'trip-list-card-title'}, getTripName(trip)),
+                    trip.destinos.length > 0 && h('div', {style: {fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem'}}, formatDestinations(trip.destinos)),
                     h('div', {className: 'trip-list-card-date'}, formatDateRange(trip.fechaInicio, trip.fechaFinal)),
                     h('div', {className: 'trip-list-card-meta'},
                         h('div', {className: 'trip-list-card-meta-item'}, h('span', null, getMotivoEmoji(trip.motivo)), h('span', null, trip.motivo)),
@@ -413,7 +426,7 @@ const MapView = ({ trips, homeCoords, onTripClick }) => {
                 }).addTo(mapInstanceRef.current);
 
                 marker.on('click', () => onTripClick(trip));
-                marker.bindPopup(`<b>${trip.destinos.map(d => d.lugar).join(' → ')}</b><br>${getMotivoEmoji(trip.motivo)} ${trip.motivo}`);
+                marker.bindPopup(`<b>${getTripName(trip)}</b><br><span style="font-size:0.85em;color:#666">${formatDestinations(trip.destinos)}</span><br>${getMotivoEmoji(trip.motivo)} ${trip.motivo}`);
                 bounds.push([firstDestino.coordinates.lat, firstDestino.coordinates.lng]);
             }
         });
@@ -465,7 +478,8 @@ const TripDetailModal = ({ trip, onClose, homeCoords, onDelete, onEdit }) => {
                     h('button', {className: 'modal-close', onClick: onClose}, '\u00d7')
                 ),
                 h('div', {className: 'modal-body'},
-                    h('h2', {className: 'trip-detail-title'}, trip.destinos.map(d => d.lugar).join(' → ')),
+                    h('h2', {className: 'trip-detail-title'}, getTripName(trip)),
+                    trip.destinos.length > 0 && h('div', {style: {fontSize: '0.95rem', color: 'var(--text-muted)', marginTop: '-0.5rem', marginBottom: '1rem'}}, formatDestinations(trip.destinos)),
                     h('div', {className: 'trip-detail-meta'},
                         h('div', {className: 'trip-detail-meta-item'}, h('span', null, '📅'), h('span', null, formatDateRange(trip.fechaInicio, trip.fechaFinal))),
                         h('div', {className: 'trip-detail-meta-item'}, h('span', null, getMotivoEmoji(trip.motivo)), h('span', null, trip.motivo)),
@@ -591,12 +605,20 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
 };
 
 const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips, uploadPhoto }) => {
-    const [formData, setFormData] = useState(editingTrip || { fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+    const [formData, setFormData] = useState(editingTrip || { trip_name: '', fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+    const [destinationsText, setDestinationsText] = useState(
+        editingTrip ? (editingTrip.destinos || []).map(d => d.lugar).join(', ') : ''
+    );
     const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
     const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
     const [isGeocoding, setIsGeocoding] = useState(false);
 
-    useEffect(() => { if (editingTrip) setFormData(editingTrip); }, [editingTrip]);
+    useEffect(() => {
+        if (editingTrip) {
+            setFormData(editingTrip);
+            setDestinationsText((editingTrip.destinos || []).map(d => d.lugar).join(', '));
+        }
+    }, [editingTrip]);
 
     const handleAddPerson = (personData) => {
         const nombre = typeof personData === 'string' ? personData : personData.nombre;
@@ -633,12 +655,34 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
     };
 
 
+    // Build destinos stubs from the quick-entry text, merging with any fully-edited cards
+    const buildDestinos = () => {
+        const textPlaces = destinationsText.split(',').map(s => s.trim()).filter(Boolean);
+        if (textPlaces.length === 0) return formData.destinos;
+        // For each place in the text field, keep an existing DestinoCard if the lugar matches,
+        // otherwise create a stub. Append any DestinoCards not mentioned in the text field.
+        const merged = textPlaces.map(lugar => {
+            const existing = formData.destinos.find(d => d.lugar === lugar);
+            return existing || { lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: null };
+        });
+        formData.destinos.forEach(d => {
+            if (!textPlaces.includes(d.lugar)) merged.push(d);
+        });
+        return merged;
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (formData.destinos.length === 0) { showToast('Agrega al menos un destino', 'warning'); return; }
-        const trip = editingTrip ? { ...formData } : { ...formData, id: Date.now(), createdAt: new Date().toISOString() };
+        if (!formData.trip_name.trim()) { showToast('El nombre del viaje es obligatorio', 'warning'); return; }
+        const finalDestinos = buildDestinos();
+        if (finalDestinos.length === 0) { showToast('Agrega al menos un destino', 'warning'); return; }
+        const tripData = { ...formData, trip_name: formData.trip_name.trim(), destinos: finalDestinos };
+        const trip = editingTrip ? tripData : { ...tripData, id: Date.now(), createdAt: new Date().toISOString() };
         onAddTrip(trip);
-        if (!editingTrip) setFormData({ fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+        if (!editingTrip) {
+            setFormData({ trip_name: '', fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
+            setDestinationsText('');
+        }
     };
 
     const suggestedPeople = allPeople.filter(p => !formData.personas.some(fp => fp.nombre === p.nombre));
@@ -658,6 +702,45 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
             h('form', {onSubmit: handleSubmit},
                 h('div', {className: 'form-section'},
                     h('h3', {className: 'form-section-title'}, 'Informaci\u00f3n General'),
+                    // ── Trip name (primary identifier) ──────────────────────────
+                    h('div', {className: 'form-group', style: {marginBottom: '1.25rem'}},
+                        h('label', {style: {fontSize: '1rem', fontWeight: '700', color: 'var(--secondary)'}}, 'Nombre del viaje *'),
+                        h('input', {
+                            type: 'text',
+                            value: formData.trip_name,
+                            onChange: (e) => setFormData({ ...formData, trip_name: e.target.value }),
+                            placeholder: 'Ej: Summer Beach Trip, Patagonia Adventure...',
+                            required: true,
+                            style: {fontSize: '1.05rem'}
+                        })
+                    ),
+                    // ── Destinations quick-entry ────────────────────────────────
+                    h('div', {className: 'form-group', style: {marginBottom: '1.25rem'}},
+                        h('label', null, 'Destinos'),
+                        h('input', {
+                            type: 'text',
+                            value: destinationsText,
+                            onChange: (e) => {
+                                const val = e.target.value;
+                                setDestinationsText(val);
+                                // Sync stubs into formData.destinos as user types
+                                const places = val.split(',').map(s => s.trim()).filter(Boolean);
+                                const newDestinos = places.map(lugar => {
+                                    const existing = formData.destinos.find(d => d.lugar === lugar);
+                                    return existing || { lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: null };
+                                });
+                                // Preserve fully-edited cards not in the text field
+                                formData.destinos.forEach(d => {
+                                    if (!places.includes(d.lugar)) newDestinos.push(d);
+                                });
+                                setFormData(prev => ({ ...prev, destinos: newDestinos }));
+                            },
+                            placeholder: 'Ej: Par\u00eds, Londres, Roma  (separados por coma)'
+                        }),
+                        h('div', {style: {fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.3rem'}},
+                            'Escrib\u00ed los destinos separados por coma. Pod\u00e9s agregar fechas y fotos por destino abajo.'
+                        )
+                    ),
                     h('div', {className: 'form-grid'},
                         h('div', {className: 'form-group'}, h('label', null, 'Fecha Inicio *'), h('input', {type: 'date', value: formData.fechaInicio, onChange: (e) => setFormData({ ...formData, fechaInicio: e.target.value }), required: true})),
                         h('div', {className: 'form-group'}, h('label', null, 'Fecha Final'), h('input', {type: 'date', value: formData.fechaFinal, onChange: (e) => setFormData({ ...formData, fechaFinal: e.target.value }), min: formData.fechaInicio})),
@@ -686,6 +769,7 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                                     h('div', {key: dest.lugar, className: 'suggested-person', onClick: () => {
                                         const newDest = { lugar: dest.lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: dest.coordinates };
                                         setFormData(prev => ({ ...prev, destinos: [...prev.destinos, newDest] }));
+                                        setDestinationsText(prev => prev ? prev + ', ' + dest.lugar : dest.lugar);
                                     }}, '📍 ', dest.lugar)
                                 ))
                             )
@@ -695,8 +779,17 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                     h('div', {className: 'destinations-list'},
                         formData.destinos.map((destino, index) => (
                             h(DestinoCard, {key: index, destino: destino, index: index, formData: formData,
-                                onSave: (idx, updated) => { const nd = [...formData.destinos]; nd[idx] = updated; setFormData({...formData, destinos: nd}); },
-                                onRemove: (idx) => setFormData({...formData, destinos: formData.destinos.filter((_, i) => i !== idx)}),
+                                onSave: (idx, updated) => {
+                                    const nd = [...formData.destinos];
+                                    nd[idx] = updated;
+                                    setFormData(prev => ({...prev, destinos: nd}));
+                                    setDestinationsText(nd.map(d => d.lugar).filter(Boolean).join(', '));
+                                },
+                                onRemove: (idx) => {
+                                    const nd = formData.destinos.filter((_, i) => i !== idx);
+                                    setFormData(prev => ({...prev, destinos: nd}));
+                                    setDestinationsText(nd.map(d => d.lugar).filter(Boolean).join(', '));
+                                },
                                 isGeocoding: isGeocoding, setIsGeocoding: setIsGeocoding, uploadPhoto: uploadPhoto
                             })
                         ))
@@ -858,12 +951,13 @@ const CSVImportPanel = ({ onImportComplete, existingTrips, showToast }) => {
 
                 h('table', {className: 'csv-preview-table'},
                     h('thead', null,
-                        h('tr', null, h('th', null), h('th', null, 'Fecha'), h('th', null, 'Destinos'), h('th', null, 'Motivo'), h('th', null, 'Personas'), h('th', null, 'Estado'))
+                        h('tr', null, h('th', null), h('th', null, 'Nombre'), h('th', null, 'Fecha'), h('th', null, 'Destinos'), h('th', null, 'Motivo'), h('th', null, 'Personas'), h('th', null, 'Estado'))
                     ),
                     h('tbody', null,
                         parsedData.trips.map((trip, i) => (
                             h('tr', {key: i, className: trip._isDuplicate ? 'duplicate' : ''},
                                 h('td', null, h('input', {type: 'checkbox', checked: selectedTrips.has(i), onChange: () => toggleTrip(i)})),
+                                h('td', null, getTripName(trip)),
                                 h('td', null, trip.fechaInicio, trip.fechaFinal && trip.fechaFinal !== trip.fechaInicio ? ' - ' + trip.fechaFinal : ''),
                                 h('td', null, trip.destinos.map(d => d.lugar).join(', ')),
                                 h('td', null, getMotivoEmoji(trip.motivo), ' ', trip.motivo),
@@ -887,8 +981,8 @@ const CSVImportPanel = ({ onImportComplete, existingTrips, showToast }) => {
     return (
         h('div', {className: 'csv-import'},
             h('h4', null, '📤 Importar viajes desde CSV'),
-            h('div', {className: 'csv-help'}, 'Sube un archivo CSV con tus viajes. El encabezado debe incluir columnas como: tripId, tripFechaInicio, tripFechaFinal, motivo, personas, notas, lugar, destFechaInicio, destFechaFinal'),
-            h('div', {className: 'csv-example'}, 'tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal'),
+            h('div', {className: 'csv-help'}, 'Sube un archivo CSV con tus viajes. El encabezado debe incluir columnas como: tripName (opcional), tripId, tripFechaInicio, tripFechaFinal, motivo, personas, notas, lugar, destFechaInicio, destFechaFinal'),
+            h('div', {className: 'csv-example'}, 'tripName,tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal'),
             h('input', {type: 'file', accept: '.csv', onChange: handleFileSelect})
         )
     );
@@ -962,7 +1056,8 @@ const TimelineView = ({ trips, onTripClick }) => {
                                                 return (
                                                     h('div', {key: trip.id, className: 'timeline-trip-mini', onClick: () => onTripClick(trip)},
                                                         firstDestino?.foto && h('img', {src: firstDestino.foto, alt: firstDestino.lugar, className: 'timeline-trip-mini-image'}),
-                                                        h('div', {className: 'timeline-trip-mini-title'}, trip.destinos.map(d => d.lugar).join(', ')),
+                                                        h('div', {className: 'timeline-trip-mini-title'}, getTripName(trip)),
+                                                        trip.destinos.length > 0 && h('div', {style: {fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem', lineHeight: '1.2'}}, formatDestinations(trip.destinos)),
                                                         h('div', {className: 'timeline-trip-mini-meta'},
                                                             h('span', null, getMotivoEmoji(trip.motivo)),
                                                             h('span', null, duracion, 'd'),
@@ -991,7 +1086,7 @@ const DashboardView = ({ trips, homeCoords }) => {
     const allDest = trips.flatMap(t => t.destinos);
     const totalDays = trips.reduce((sum, t) => sum + Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1), 0);
     const avgTripLength = Math.round(totalDays / totalTrips);
-    const longestTrip = trips.reduce((best, t) => { const d = Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1); return d > best.days ? { name: t.destinos.map(dd => dd.lugar).join(', '), days: d } : best; }, { name: '', days: 0 });
+    const longestTrip = trips.reduce((best, t) => { const d = Math.max(1, t.fechaFinal ? Math.ceil((new Date(t.fechaFinal) - new Date(t.fechaInicio)) / 86400000) : 1); return d > best.days ? { name: getTripName(t), days: d } : best; }, { name: '', days: 0 });
     const longestPct = ((longestTrip.days / 365) * 100).toFixed(1);
     let totalKm = 0;
     if (homeCoords) {
@@ -1445,8 +1540,9 @@ const TripsCarousel = ({ trips, onEditTrip, onDeleteTrip }) => {
                         h('span', null, getMotivoLabel(trip.motivo))
                     ),
                     !isExpanded && h('div', {className: 'carousel-card__label'},
-                        h('div', {className: 'carousel-card__title'},
-                            trip.destinos.map(d => d.lugar.split(',')[0].trim()).join(' → ')
+                        h('div', {className: 'carousel-card__title'}, getTripName(trip)),
+                        formatDestinations(trip.destinos) && h('div', {className: 'carousel-card__subtitle'},
+                            formatDestinations(trip.destinos)
                         ),
                         h('div', {className: 'carousel-card__date'},
                             formatDateRange(trip.fechaInicio, trip.fechaFinal)
@@ -1464,8 +1560,9 @@ const TripsCarousel = ({ trips, onEditTrip, onDeleteTrip }) => {
                             'aria-label': 'Cerrar'
                         }, h(Icon, {name: 'close', size: 18, strokeWidth: 2})),
 
-                        h('h2', {className: 'carousel-exp__title'},
-                            trip.destinos.map(d => d.lugar.split(',')[0].trim()).join(' → ')
+                        h('h2', {className: 'carousel-exp__title'}, getTripName(trip)),
+                        formatDestinations(trip.destinos) && h('div', {className: 'carousel-exp__subtitle'},
+                            formatDestinations(trip.destinos)
                         ),
                         h('div', {className: 'carousel-exp__date'},
                             h(Icon, {name: 'calendar', size: 14, color: 'var(--text-secondary)', strokeWidth: 1.8}),
@@ -1546,6 +1643,7 @@ const TripsListView = ({ trips, onTripClick, onEditTrip, onDeleteTrip }) => {
 
 const dbToTrip = (row) => ({
     id:          row.id,
+    trip_name:   row.trip_name   || '',
     fechaInicio: row.start_date,
     fechaFinal:  row.end_date   || '',
     motivo:      row.trip_type  || 'otro',
@@ -1565,6 +1663,10 @@ const tripToDb = (trip, userId) => {
             return parts[parts.length - 1].trim();
         })
     ).size;
+    // Use explicit trip_name if set; fall back to joined destinations
+    const tripName = (trip.trip_name || '').trim()
+        || (trip.destinos || []).map(d => d.lugar).join(' → ')
+        || null;
     return {
         user_id:           userId,
         start_date:        trip.fechaInicio  || null,
@@ -1573,7 +1675,7 @@ const tripToDb = (trip, userId) => {
         destinations:      trip.destinos     || [],
         personas:          trip.personas     || [],
         notas:             trip.notas        || null,
-        trip_name:         (trip.destinos || []).map(d => d.lugar).join(' → ') || null,
+        trip_name:         tripName,
         days_count:        days,
         cities_visited:    (trip.destinos || []).length,
         countries_visited: countries,
@@ -1710,6 +1812,32 @@ const App = () => {
                     const loadedTrips = (rows || []).map(dbToTrip);
                     setTrips(loadedTrips);
                     setTripsLoading(false);
+
+                    // ── 4b. BACKFILL trip_name for existing trips (one-time) ───
+                    const tripNameMigKey = 'nomadAtlas_tripname_migrated_' + authUser.id;
+                    if (localStorage.getItem(tripNameMigKey) !== 'done') {
+                        const tripsNeedingName = loadedTrips.filter(t => !t.trip_name);
+                        if (tripsNeedingName.length > 0) {
+                            console.log('[Migration] Backfilling trip_name for', tripsNeedingName.length, 'trip(s)...');
+                            for (const t of tripsNeedingName) {
+                                const generated = (t.destinos || []).map(d => d.lugar).join(' \u2192 ') || 'Viaje sin nombre';
+                                await window.supabase.from('trips')
+                                    .update({ trip_name: generated })
+                                    .eq('id', t.id);
+                                console.log('[Migration] Trip', t.id, ': trip_name set to "' + generated + '"');
+                            }
+                            // Update local state so UI reflects names immediately
+                            setTrips(prev => prev.map(t => {
+                                if (!t.trip_name) {
+                                    return { ...t, trip_name: (t.destinos || []).map(d => d.lugar).join(' \u2192 ') || 'Viaje sin nombre' };
+                                }
+                                return t;
+                            }));
+                        }
+                        localStorage.setItem(tripNameMigKey, 'done');
+                        console.log('[Migration] trip_name backfill complete.');
+                    }
+
                     // ── 5. BACKGROUND PHOTO MIGRATION (base64 → Storage) ───────
                     // Silently upload any base64 photos still in the DB and replace with URLs
                     const migratePhotos = async () => {
@@ -1941,12 +2069,12 @@ const App = () => {
     };
 
     const handleExportCSV = () => {
-        const header = 'tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal';
+        const header = 'tripName,tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal';
         const rows = [];
         trips.forEach((trip, tripIndex) => {
             trip.destinos.forEach(dest => {
                 const escapeCsv = (val) => { const str = String(val || ''); return str.includes(',') || str.includes('"') || str.includes('\n') ? '"' + str.replace(/"/g, '""') + '"' : str; };
-                rows.push([tripIndex + 1, trip.fechaInicio, trip.fechaFinal || '', trip.motivo, trip.personas.map(p => p.nombre).join('; '), escapeCsv(trip.notas), escapeCsv(dest.lugar), dest.fechaInicio || '', dest.fechaFinal || ''].join(','));
+                rows.push([escapeCsv(getTripName(trip)), tripIndex + 1, trip.fechaInicio, trip.fechaFinal || '', trip.motivo, trip.personas.map(p => p.nombre).join('; '), escapeCsv(trip.notas), escapeCsv(dest.lugar), dest.fechaInicio || '', dest.fechaFinal || ''].join(','));
             });
         });
         const csv = header + '\n' + rows.join('\n');
