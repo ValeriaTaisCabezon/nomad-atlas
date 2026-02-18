@@ -893,3 +893,66 @@ textarea { min-height: 100px; resize: vertical; }
     .bento-card { padding: 0.6rem 0.75rem; }
     .bento-label { font-size: 0.6rem; }
 }
+
+/* ── Auth header bar (user email + logout) ───────────────────────────────── */
+.auth-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+    background: rgba(42, 90, 74, 0.07);
+    border: 1px solid rgba(42, 90, 74, 0.15);
+    border-radius: 20px;
+    font-family: 'Outfit', sans-serif;
+}
+
+.auth-bar__email {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--secondary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.auth-bar__logout {
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid rgba(42, 90, 74, 0.3);
+    border-radius: 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.auth-bar__logout:hover {
+    background: var(--secondary);
+    color: #fff;
+    border-color: var(--secondary);
+}
+
+/* Position auth bar inside folder-nav-inner */
+.folder-nav-inner {
+    position: relative;
+}
+
+.folder-nav-inner .auth-bar {
+    margin-left: auto;
+    margin-right: 0;
+    flex-shrink: 0;
+}
+
+/* On mobile, shrink the email further */
+@media (max-width: 768px) {
+    .auth-bar__email { max-width: 120px; font-size: 0.72rem; }
+    .auth-bar__logout { font-size: 0.7rem; padding: 0.2rem 0.5rem; }
+}
+
+@media (max-width: 480px) {
+    .auth-bar__email { display: none; }
+}

@@ -106,6 +106,53 @@ const compressImage = (dataUrl, maxWidth = 800, quality = 0.6) => {
     });
 };
 
+// ── Supabase Storage helpers ──────────────────────────────────────────────────
+
+const dataUrlToBlob = (dataUrl) => {
+    const [header, base64] = dataUrl.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(base64);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+    return new Blob([array], { type: mime });
+};
+
+const uploadPhotoToStorage = async (userId, dataUrl) => {
+    try {
+        if (!userId || !dataUrl || !dataUrl.startsWith('data:')) return null;
+        const blob = dataUrlToBlob(dataUrl);
+        const path = userId + '/' + crypto.randomUUID() + '.jpg';
+        const { error } = await window.supabase.storage
+            .from('trip-photos')
+            .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+        if (error) { console.error('Photo upload error:', error.message); return null; }
+        const { data } = window.supabase.storage.from('trip-photos').getPublicUrl(path);
+        return data.publicUrl;
+    } catch(e) {
+        console.error('Photo upload exception:', e.message);
+        return null;
+    }
+};
+
+const SUPABASE_STORAGE_BASE = 'https://eohzflignqhoasklfjod.supabase.co/storage/v1/object/public/trip-photos/';
+
+const deletePhotosFromStorage = async (trip) => {
+    const paths = [];
+    (trip.destinos || []).forEach(d => {
+        if (d.foto && d.foto.startsWith(SUPABASE_STORAGE_BASE))
+            paths.push(d.foto.replace(SUPABASE_STORAGE_BASE, ''));
+    });
+    (trip.personas || []).forEach(p => {
+        if (p.foto && p.foto.startsWith(SUPABASE_STORAGE_BASE))
+            paths.push(p.foto.replace(SUPABASE_STORAGE_BASE, ''));
+    });
+    if (paths.length === 0) return;
+    const { error } = await window.supabase.storage.from('trip-photos').remove(paths);
+    if (error) console.error('Photo deletion error:', error);
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const formatDateRange = (startDate, endDate) => {
     if (!startDate) return '';
     const opts = { day: 'numeric', month: 'short' };
@@ -119,10 +166,6 @@ const formatDateRange = (startDate, endDate) => {
     return s.toLocaleDateString('es-ES', optsYear) + ' - ' + e.toLocaleDateString('es-ES', optsYear);
 };
 
-const safeSetItem = (key, value, showToast) => {
-    try { localStorage.setItem(key, value); }
-    catch (e) { if (showToast) showToast('Almacenamiento lleno. Intenta eliminar fotos de algunos viajes.', 'error'); console.error('localStorage quota exceeded:', e); }
-};
 
 const ToastContainer = ({ toasts }) => (
     h('div', {className: 'toast-container'},
@@ -471,7 +514,7 @@ const TripDetailModal = ({ trip, onClose, homeCoords, onDelete, onEdit }) => {
     );
 };
 
-const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, setIsGeocoding }) => {
+const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, setIsGeocoding, uploadPhoto }) => {
     const [isEditing, setIsEditing] = useState(!!destino._isNew);
     const [local, setLocal] = useState({ ...destino });
     const [localPreview, setLocalPreview] = useState(destino.foto);
@@ -483,8 +526,11 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const compressed = await compressImage(reader.result, 800, 0.6);
-                setLocal(prev => ({ ...prev, foto: compressed }));
-                setLocalPreview(compressed);
+                setLocalPreview(compressed);                              // instant preview while upload runs
+                const url = uploadPhoto ? await uploadPhoto(compressed) : null;
+                const fotoValue = url || compressed;                      // fallback to base64 on upload failure
+                setLocal(prev => ({ ...prev, foto: fotoValue }));
+                setLocalPreview(fotoValue);
             };
             reader.readAsDataURL(file);
         }
@@ -544,7 +590,7 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
     );
 };
 
-const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips }) => {
+const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips, uploadPhoto }) => {
     const [formData, setFormData] = useState(editingTrip || { fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
     const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
     const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
@@ -569,8 +615,11 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const compressed = await compressImage(reader.result, 200, 0.7);
-                setCurrentPerson(prev => ({ ...prev, foto: compressed }));
-                setPersonPreviewUrl(compressed);
+                setPersonPreviewUrl(compressed);                              // instant preview
+                const url = uploadPhoto ? await uploadPhoto(compressed) : null;
+                const fotoValue = url || compressed;                          // fallback to base64
+                setCurrentPerson(prev => ({ ...prev, foto: fotoValue }));
+                setPersonPreviewUrl(fotoValue);
             };
             reader.readAsDataURL(file);
         }
@@ -648,7 +697,7 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                             h(DestinoCard, {key: index, destino: destino, index: index, formData: formData,
                                 onSave: (idx, updated) => { const nd = [...formData.destinos]; nd[idx] = updated; setFormData({...formData, destinos: nd}); },
                                 onRemove: (idx) => setFormData({...formData, destinos: formData.destinos.filter((_, i) => i !== idx)}),
-                                isGeocoding: isGeocoding, setIsGeocoding: setIsGeocoding
+                                isGeocoding: isGeocoding, setIsGeocoding: setIsGeocoding, uploadPhoto: uploadPhoto
                             })
                         ))
                     ),
@@ -1493,6 +1542,46 @@ const TripsListView = ({ trips, onTripClick, onEditTrip, onDeleteTrip }) => {
     return h(TripsCarousel, { trips, onEditTrip, onDeleteTrip });
 };
 
+// ── Supabase data-mapping helpers ─────────────────────────────────────────────
+
+const dbToTrip = (row) => ({
+    id:          row.id,
+    fechaInicio: row.start_date,
+    fechaFinal:  row.end_date   || '',
+    motivo:      row.trip_type  || 'otro',
+    destinos:    row.destinations || [],
+    personas:    row.personas     || [],
+    notas:       row.notas        || '',
+    createdAt:   row.created_at,
+});
+
+const tripToDb = (trip, userId) => {
+    const days = trip.fechaFinal
+        ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / 86400000)
+        : 1;
+    const countries = new Set(
+        (trip.destinos || []).map(d => {
+            const parts = (d.lugar || '').split(',');
+            return parts[parts.length - 1].trim();
+        })
+    ).size;
+    return {
+        user_id:           userId,
+        start_date:        trip.fechaInicio  || null,
+        end_date:          trip.fechaFinal   || null,
+        trip_type:         trip.motivo       || 'otro',
+        destinations:      trip.destinos     || [],
+        personas:          trip.personas     || [],
+        notas:             trip.notas        || null,
+        trip_name:         (trip.destinos || []).map(d => d.lugar).join(' → ') || null,
+        days_count:        days,
+        cities_visited:    (trip.destinos || []).length,
+        countries_visited: countries,
+    };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const App = () => {
     const [activeTab, setActiveTab] = useState('trips');
     const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
@@ -1506,7 +1595,10 @@ const App = () => {
     const [editingTrip, setEditingTrip] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', onConfirm: null, danger: false });
-    const [lastImportDate, setLastImportDate] = useState(localStorage.getItem('nomadAtlasLastImport'));
+    const [lastImportDate, setLastImportDate] = useState(null);
+    const [authUser, setAuthUser] = useState(null);
+    const [authReady, setAuthReady] = useState(false);
+    const [tripsLoading, setTripsLoading] = useState(true);
 
     const showToast = (message, type) => {
         type = type || 'success';
@@ -1519,39 +1611,177 @@ const App = () => {
         setConfirmDialog({ isOpen: true, title, message, onConfirm: () => { onConfirm(); setConfirmDialog(d => ({...d, isOpen: false})); }, danger: !!danger });
     };
 
+    // ── Auth guard: redirect to login if not authenticated ───────────────────
     useEffect(() => {
-        const savedTrips = localStorage.getItem('nomadAtlasTrips');
-        const savedProfile = localStorage.getItem('nomadAtlasProfile');
-        if (savedTrips) {
-            try { setTrips(JSON.parse(savedTrips)); }
-            catch (e) { console.error('Error loading trips:', e); }
-        }
-        if (savedProfile) {
-            try {
-                const prof = JSON.parse(savedProfile);
-                setProfile(prof);
-                if (prof.ubicacion) {
-                    geocodePlace(prof.ubicacion).then(coords => {
-                        if (coords) setHomeCoords(coords);
-                    });
-                }
-                setActiveTab('trips');
+        // onAuthStateChange fires immediately with the current session,
+        // so we use it as the single source of truth (no separate getSession call needed).
+        const { data: { subscription } } = window.supabase.auth.onAuthStateChange((_event, session) => {
+            if (!session) {
+                window.location.href = 'login.html';
+            } else {
+                setAuthUser(session.user);
+                setAuthReady(true);
             }
-            catch (e) { console.error('Error loading profile:', e); }
-        }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    useEffect(() => { safeSetItem('nomadAtlasTrips', JSON.stringify(trips), showToast); }, [trips]);
+    // ── Supabase: load profile + migrate localStorage + load trips + realtime ──
     useEffect(() => {
-        if (profile) {
-            safeSetItem('nomadAtlasProfile', JSON.stringify(profile), showToast);
-            if (profile.ubicacion && !homeCoords) {
-                geocodePlace(profile.ubicacion).then(coords => {
-                    if (coords) setHomeCoords(coords);
-                });
+        if (!authReady || !authUser) return;
+
+        let channel = null;
+
+        const init = async () => {
+            setTripsLoading(true);
+
+            // ── 1. PROFILE ─────────────────────────────────────────────────────
+            try {
+                const { data: profileRow, error: profileErr } = await window.supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('user_id', authUser.id)
+                    .single();
+
+                if (profileRow && !profileErr) {
+                    const prof = { nombre: profileRow.nombre, ubicacion: profileRow.ubicacion, emoji: profileRow.emoji };
+                    setProfile(prof);
+                    if (profileRow.last_import_at) setLastImportDate(profileRow.last_import_at);
+                    if (prof.ubicacion) {
+                        geocodePlace(prof.ubicacion).then(coords => { if (coords) setHomeCoords(coords); });
+                    }
+                    setActiveTab('trips');
+                } else {
+                    // Migrate profile from localStorage if present
+                    const localProfileRaw = localStorage.getItem('nomadAtlasProfile');
+                    if (localProfileRaw) {
+                        try {
+                            const localProf = JSON.parse(localProfileRaw);
+                            await window.supabase.from('profiles').upsert({
+                                user_id:   authUser.id,
+                                nombre:    localProf.nombre    || '',
+                                ubicacion: localProf.ubicacion || '',
+                                emoji:     localProf.emoji     || '🌍',
+                                updated_at: new Date().toISOString(),
+                            });
+                            setProfile(localProf);
+                            localStorage.removeItem('nomadAtlasProfile');
+                            if (localProf.ubicacion) {
+                                geocodePlace(localProf.ubicacion).then(coords => { if (coords) setHomeCoords(coords); });
+                            }
+                            setActiveTab('trips');
+                        } catch(e) { console.error('Profile migration error:', e); }
+                    }
+                }
+            } catch(e) { console.error('Profile load error:', e); }
+
+            // ── 2. MIGRATE localStorage trips (once per user) ─────────────────
+            const migKey = 'nomadAtlas_migrated_' + authUser.id;
+            if (localStorage.getItem(migKey) !== 'done') {
+                try {
+                    const localTripsRaw = localStorage.getItem('nomadAtlasTrips');
+                    const localTrips = localTripsRaw ? JSON.parse(localTripsRaw) : [];
+                    if (localTrips.length > 0) {
+                        const rows = localTrips.map(t => tripToDb(t, authUser.id));
+                        const { error: migErr } = await window.supabase.from('trips').insert(rows);
+                        if (!migErr) {
+                            localStorage.removeItem('nomadAtlasTrips');
+                            localStorage.setItem(migKey, 'done');
+                        } else {
+                            console.error('Trip migration error:', migErr);
+                            showToast('Error migrando viajes locales. Se reintentará al próximo inicio de sesión.', 'warning');
+                        }
+                    } else {
+                        // Nothing to migrate — mark done so we don't check again
+                        localStorage.setItem(migKey, 'done');
+                    }
+                } catch(e) { console.error('Migration error:', e); }
             }
-        }
-    }, [profile]);
+
+            // ── 3. LOAD TRIPS FROM SUPABASE ───────────────────────────────────
+            try {
+                const { data: rows, error: loadErr } = await window.supabase
+                    .from('trips')
+                    .select('*')
+                    .eq('user_id', authUser.id)
+                    .order('start_date', { ascending: false });
+                if (!loadErr) {
+                    const loadedTrips = (rows || []).map(dbToTrip);
+                    setTrips(loadedTrips);
+                    setTripsLoading(false);
+                    // ── 5. BACKGROUND PHOTO MIGRATION (base64 → Storage) ───────
+                    // Silently upload any base64 photos still in the DB and replace with URLs
+                    const migratePhotos = async () => {
+                        for (const trip of loadedTrips) {
+                            let changed = false;
+                            const newDests = await Promise.all(
+                                (trip.destinos || []).map(async d => {
+                                    if (d.foto && d.foto.startsWith('data:')) {
+                                        const url = await uploadPhotoToStorage(authUser.id, d.foto);
+                                        if (url) { changed = true; return { ...d, foto: url }; }
+                                    }
+                                    return d;
+                                })
+                            );
+                            const newPersonas = await Promise.all(
+                                (trip.personas || []).map(async p => {
+                                    if (p.foto && p.foto.startsWith('data:')) {
+                                        const url = await uploadPhotoToStorage(authUser.id, p.foto);
+                                        if (url) { changed = true; return { ...p, foto: url }; }
+                                    }
+                                    return p;
+                                })
+                            );
+                            if (changed) {
+                                setTrips(prev => prev.map(t => t.id === trip.id
+                                    ? { ...t, destinos: newDests, personas: newPersonas } : t));
+                                await window.supabase.from('trips')
+                                    .update({ destinations: newDests, personas: newPersonas })
+                                    .eq('id', trip.id);
+                            }
+                        }
+                    };
+                    if (loadedTrips.length > 0) migratePhotos(); // fire-and-forget
+                } else {
+                    console.error('Trips load error:', loadErr);
+                    showToast('Error cargando viajes. Verifica tu conexión.', 'error');
+                    setTripsLoading(false);
+                }
+            } catch(e) { console.error('Trips load error:', e); setTripsLoading(false); }
+
+            // ── 4. REAL-TIME SUBSCRIPTION ──────────────────────────────────────
+            channel = window.supabase
+                .channel('trips-realtime-' + authUser.id)
+                .on('postgres_changes', {
+                    event:  '*',
+                    schema: 'public',
+                    table:  'trips',
+                    filter: 'user_id=eq.' + authUser.id,
+                }, (payload) => {
+                    if (payload.eventType === 'INSERT') {
+                        setTrips(prev => {
+                            // Skip if already present (own optimistic insert)
+                            if (prev.some(t => t.id === payload.new.id)) return prev;
+                            return [dbToTrip(payload.new), ...prev];
+                        });
+                    } else if (payload.eventType === 'UPDATE') {
+                        setTrips(prev => prev.map(t =>
+                            t.id === payload.new.id ? dbToTrip(payload.new) : t
+                        ));
+                    } else if (payload.eventType === 'DELETE') {
+                        setTrips(prev => prev.filter(t => t.id !== payload.old.id));
+                    }
+                })
+                .subscribe();
+        };
+
+        init();
+
+        return () => {
+            if (channel) channel.unsubscribe();
+        };
+    }, [authReady, authUser]);
 
     // Close year dropdown on outside click
     useEffect(() => {
@@ -1574,43 +1804,125 @@ const App = () => {
         return tabMap[activeTab] || '#EDE5DB';
     };
 
-    const handleAddTrip = (trip) => {
+    const handleAddTrip = async (trip) => {
         if (editingTrip) {
-            setTrips(trips.map(t => t.id === trip.id ? trip : t));
+            // ── EDIT: optimistic update then persist ───────────────────────────
+            const prevTrip = trips.find(t => t.id === trip.id);
+            setTrips(prev => prev.map(t => t.id === trip.id ? trip : t));
             setEditingTrip(null);
+            setShowAddForm(false);
+            const { error } = await window.supabase
+                .from('trips')
+                .update(tripToDb(trip, authUser.id))
+                .eq('id', trip.id);
+            if (error) {
+                console.error('Update error:', error);
+                // Rollback
+                setTrips(prev => prev.map(t => t.id === trip.id ? prevTrip : t));
+                showToast('Error guardando cambios. Intenta de nuevo.', 'error');
+            }
         } else {
-            setTrips([trip, ...trips]);
+            // ── CREATE: optimistic insert with tempId ─────────────────────────
+            const tempId = 'temp-' + Date.now();
+            const optimistic = { ...trip, id: tempId };
+            setTrips(prev => [optimistic, ...prev]);
+            setShowAddForm(false);
+            const { data, error } = await window.supabase
+                .from('trips')
+                .insert(tripToDb(trip, authUser.id))
+                .select()
+                .single();
+            if (error) {
+                console.error('Insert error:', error);
+                setTrips(prev => prev.filter(t => t.id !== tempId));
+                showToast('Error guardando viaje. Verifica tu conexión.', 'error');
+            } else {
+                // Replace temp row with real UUID row from Supabase
+                setTrips(prev => prev.map(t => t.id === tempId ? dbToTrip(data) : t));
+            }
         }
-        setShowAddForm(false);
     };
 
-    const handleImportTrips = (newTrips) => {
-        setTrips(prev => [...newTrips, ...prev]);
-        safeSetItem('nomadAtlasLastImport', new Date().toISOString());
-        setLastImportDate(new Date().toISOString());
+    const handleImportTrips = async (newTrips) => {
+        // Optimistic: assign temp IDs so UI updates instantly
+        const withTempIds = newTrips.map((t, i) => ({ ...t, id: 'temp-' + Date.now() + '-' + i }));
+        setTrips(prev => [...withTempIds, ...prev]);
+        const now = new Date().toISOString();
+        setLastImportDate(now);
         setActiveTab('trips');
-    };
-
-    const handleUpdateProfile = (newProfile) => {
-        setProfile(newProfile);
-        if (newProfile.ubicacion) {
-            geocodePlace(newProfile.ubicacion).then(coords => {
-                if (coords) setHomeCoords(coords);
+        // Persist last_import_at to Supabase (fire-and-forget)
+        if (authUser) {
+            window.supabase.from('profiles').upsert({
+                user_id: authUser.id, last_import_at: now, updated_at: now,
             });
         }
+
+        const rows = newTrips.map(t => tripToDb(t, authUser.id));
+        const { data, error } = await window.supabase.from('trips').insert(rows).select();
+        if (error) {
+            console.error('Import error:', error);
+            // Rollback temp rows
+            setTrips(prev => prev.filter(t => !String(t.id).startsWith('temp-')));
+            showToast('Error importando viajes. Verifica tu conexión.', 'error');
+        } else {
+            // Swap temp rows for real UUID rows
+            setTrips(prev => {
+                const real = (data || []).map(dbToTrip);
+                return [...real, ...prev.filter(t => !String(t.id).startsWith('temp-'))];
+            });
+        }
+    };
+
+    const handleUpdateProfile = async (newProfile) => {
+        setProfile(newProfile);
+        if (newProfile.ubicacion) {
+            geocodePlace(newProfile.ubicacion).then(coords => { if (coords) setHomeCoords(coords); });
+        }
         setActiveTab('map');
+        try {
+            await window.supabase.from('profiles').upsert({
+                user_id:    authUser.id,
+                nombre:     newProfile.nombre    || '',
+                ubicacion:  newProfile.ubicacion || '',
+                emoji:      newProfile.emoji     || '🌍',
+                updated_at: new Date().toISOString(),
+            });
+        } catch(e) {
+            console.error('Profile save error:', e);
+            showToast('Error guardando perfil. Intenta de nuevo.', 'error');
+        }
     };
 
     const handleEditTrip = (trip) => { setEditingTrip(trip); setShowAddForm(true); setActiveTab('trips'); };
+
+    const handleLogout = async () => {
+        await window.supabase.auth.signOut();
+        // onAuthStateChange will redirect to login.html automatically
+    };
 
     const handleDeleteTrip = (tripId) => {
         showConfirm(
             'Eliminar Viaje',
             'Este viaje se eliminara permanentemente. Esta accion no se puede deshacer.',
-            () => {
+            async () => {
+                // Optimistic: remove from UI immediately
+                const removed = trips.find(t => t.id === tripId);
                 setTrips(prev => prev.filter(t => t.id !== tripId));
                 setSelectedTrip(null);
                 showToast('Viaje eliminado', 'success');
+                // Delete photos from Storage (fire-and-forget)
+                if (removed) deletePhotosFromStorage(removed);
+                // Persist to Supabase
+                const { error } = await window.supabase
+                    .from('trips')
+                    .delete()
+                    .eq('id', tripId);
+                if (error) {
+                    console.error('Delete error:', error);
+                    // Rollback — put the trip back
+                    if (removed) setTrips(prev => [removed, ...prev]);
+                    showToast('Error eliminando viaje. Intenta de nuevo.', 'error');
+                }
             },
             true
         );
@@ -1662,11 +1974,23 @@ const App = () => {
                 showConfirm(
                     'Restaurar Backup',
                     'Este backup contiene ' + data.trips.length + ' viajes' + (data.profile ? ' y un perfil' : '') + '. Los datos actuales seran reemplazados. Continuar?',
-                    () => {
-                        setTrips(data.trips);
-                        if (data.profile) setProfile(data.profile);
-                        safeSetItem('nomadAtlasLastImport', new Date().toISOString());
-                        setLastImportDate(new Date().toISOString());
+                    async () => {
+                        // Delete existing Supabase data first
+                        if (authUser) {
+                            await window.supabase.from('trips').delete().eq('user_id', authUser.id);
+                        }
+                        // Re-import via the existing import handler (handles optimistic + Supabase insert)
+                        await handleImportTrips(data.trips);
+                        if (data.profile && authUser) {
+                            await handleUpdateProfile(data.profile);
+                        }
+                        const now = new Date().toISOString();
+                        setLastImportDate(now);
+                        if (authUser) {
+                            window.supabase.from('profiles').upsert({
+                                user_id: authUser.id, last_import_at: now, updated_at: now,
+                            });
+                        }
                         showToast('Backup restaurado: ' + data.trips.length + ' viajes', 'success');
                     },
                     true
@@ -1683,16 +2007,32 @@ const App = () => {
         showConfirm(
             'Borrar Todos los Datos',
             'Se eliminaran TODOS los viajes y tu perfil. Esta accion no se puede deshacer. Te recomendamos exportar un backup antes.',
-            () => {
+            async () => {
+                // Optimistic: clear UI immediately
                 setTrips([]);
                 setProfile(null);
                 setHomeCoords(null);
                 localStorage.removeItem('nomadAtlasTrips');
                 localStorage.removeItem('nomadAtlasProfile');
-                localStorage.removeItem('nomadAtlasLastImport');
+                if (authUser) {
+                    localStorage.removeItem('nomadAtlas_migrated_' + authUser.id);
+                }
                 setLastImportDate(null);
                 setActiveTab('settings');
                 showToast('Todos los datos han sido eliminados', 'warning');
+                // Persist deletions to Supabase
+                if (authUser) {
+                    await window.supabase.from('trips').delete().eq('user_id', authUser.id);
+                    await window.supabase.from('profiles').delete().eq('user_id', authUser.id);
+                    // Delete all photos from Storage for this user
+                    const { data: files } = await window.supabase.storage
+                        .from('trip-photos')
+                        .list(authUser.id);
+                    if (files && files.length > 0) {
+                        const paths = files.map(f => authUser.id + '/' + f.name);
+                        await window.supabase.storage.from('trip-photos').remove(paths);
+                    }
+                }
             },
             true
         );
@@ -1702,6 +2042,14 @@ const App = () => {
     const allDestinations = [...new Map(trips.flatMap(t => t.destinos).map(d => [d.lugar, { lugar: d.lugar, coordinates: d.coordinates }])).values()];
     const availableYears = [...new Set(trips.map(t => new Date(t.fechaInicio).getFullYear()))].sort((a, b) => b - a);
     const filteredTrips = selectedYear === 'all' ? trips : trips.filter(t => new Date(t.fechaInicio).getFullYear() === parseInt(selectedYear));
+
+    // Bound photo upload callback — closes over authUser.id
+    const uploadPhoto = authUser
+        ? (dataUrl) => uploadPhotoToStorage(authUser.id, dataUrl)
+        : null;
+
+    // Don't render anything until auth state is resolved (avoids flash + black screen)
+    if (!authReady) return null;
 
     return (
         h('div', {className: 'app-container'},
@@ -1736,6 +2084,12 @@ const App = () => {
                             disabled: !profile,
                             style: activeTab === 'dashboard' ? {background: 'var(--tab-dashboard)'} : {}
                         }, 'Dashboard')
+                    ),
+
+                    // Auth bar (user email + logout)
+                    authUser && h('div', {className: 'auth-bar'},
+                        h('span', {className: 'auth-bar__email', title: authUser.email}, authUser.email),
+                        h('button', {className: 'auth-bar__logout', onClick: handleLogout}, 'Salir')
                     )
                 )
             ),
@@ -1756,25 +2110,30 @@ const App = () => {
                     ),
 
                     activeTab === 'trips' && profile && (
-                        h(React.Fragment, null,
-                            h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip}),
-                            (showAddForm || editingTrip) && (
-                                h(AddTripForm, {onAddTrip: (trip) => { handleAddTrip(trip); setShowAddForm(false); }, allPeople: allPeople, allDestinations: allDestinations, editingTrip: editingTrip, onCancelEdit: () => { setEditingTrip(null); setShowAddForm(false); }, existingTrips: trips, showToast: showToast, onImportTrips: handleImportTrips})
-                            ),
-                            h('div', {className: 'trips-add-bar'},
-                                h('button', {
-                                    className: 'trips-add-btn' + (showAddForm ? ' trips-add-btn--open' : ''),
-                                    onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }
-                                },
-                                    h('svg', {width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'},
-                                        showAddForm
-                                            ? h('path', {d: 'M18 6 6 18M6 6l12 12'})
-                                            : h(React.Fragment, null, h('line', {x1: 12, y1: 5, x2: 12, y2: 19}), h('line', {x1: 5, y1: 12, x2: 19, y2: 12}))
-                                    ),
-                                    showAddForm ? 'Cerrar' : 'Nuevo Viaje'
+                        tripsLoading
+                            ? h('div', {className: 'empty-state', style: {paddingTop: '4rem'}},
+                                h('div', {className: 'loading'}),
+                                h('div', {className: 'empty-state-text', style: {marginTop: '1rem', fontSize: '0.95rem', color: 'var(--text-muted)'}}, 'Cargando viajes...')
+                              )
+                            : h(React.Fragment, null,
+                                h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip}),
+                                (showAddForm || editingTrip) && (
+                                    h(AddTripForm, {onAddTrip: handleAddTrip, allPeople: allPeople, allDestinations: allDestinations, editingTrip: editingTrip, onCancelEdit: () => { setEditingTrip(null); setShowAddForm(false); }, existingTrips: trips, showToast: showToast, onImportTrips: handleImportTrips, uploadPhoto: uploadPhoto})
+                                ),
+                                h('div', {className: 'trips-add-bar'},
+                                    h('button', {
+                                        className: 'trips-add-btn' + (showAddForm ? ' trips-add-btn--open' : ''),
+                                        onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }
+                                    },
+                                        h('svg', {width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'},
+                                            showAddForm
+                                                ? h('path', {d: 'M18 6 6 18M6 6l12 12'})
+                                                : h(React.Fragment, null, h('line', {x1: 12, y1: 5, x2: 12, y2: 19}), h('line', {x1: 5, y1: 12, x2: 19, y2: 12}))
+                                        ),
+                                        showAddForm ? 'Cerrar' : 'Nuevo Viaje'
+                                    )
                                 )
-                            )
-                        )
+                              )
                     ),
 
                     activeTab === 'timeline' && profile && h(TimelineView, {trips: filteredTrips, onTripClick: setSelectedTrip}),

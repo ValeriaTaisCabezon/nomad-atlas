@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-02-18 — Supabase auth setup (no data migration)
+
+### What changed
+
+Integrated Supabase authentication so the app requires a logged-in user. localStorage data is untouched — this session only adds auth plumbing, not data migration.
+
+### New files
+
+- **`js/supabase.js`** — Supabase JS v2 client initialised with project URL + anon key; exported as `window.supabase`.
+- **`login.html`** — Standalone login/signup page. Email + password auth via Supabase. Toggle between login and signup modes. Friendly Spanish error messages. Matches app color palette and is mobile-responsive. On successful login, redirects to `index.html`.
+
+### Modified files
+
+**`index.html`**
+- Added CDN `<script>` for `@supabase/supabase-js@2`
+- Added `<script src="js/supabase.js">` (loads before `app.js`)
+
+**`js/app.js`**
+- New `authUser` state in `App`
+- Auth guard `useEffect`: calls `supabase.auth.getSession()` on mount; redirects to `login.html` if no session. Subscribes to `onAuthStateChange` to catch logouts and token expiry. Cleans up subscription on unmount.
+- `handleLogout()`: calls `supabase.auth.signOut()`; the auth state listener handles the redirect.
+- Auth bar rendered in the folder nav: shows logged-in user's email + "Salir" button.
+
+**`css/styles.css`**
+- `.auth-bar`, `.auth-bar__email`, `.auth-bar__logout` — pill-style user info bar in the nav header. Responsive: email truncated on tablet, hidden on small phone.
+
+### Auth flow
+
+```
+Open index.html → auth guard → not logged in → redirect to login.html
+login.html → sign up / log in → redirect to index.html
+index.html header → "Salir" button → supabase.signOut() → redirect to login.html
+```
+
+### What did NOT change
+
+- All trips functionality is identical
+- localStorage data format unchanged
+- No data migration (next session)
+
+---
+
 ## 2026-02-17 — Carousel: expanded card fits viewport (v2 — preserve collapsed size)
 
 ### Fix
