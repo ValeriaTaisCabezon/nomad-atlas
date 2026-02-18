@@ -1,19 +1,87 @@
 ﻿const h = React.createElement;
 const { useState, useEffect, useRef } = React;
 
-const geocodeQueue = { lastCall: 0 };
-const geocodePlace = async (place) => {
+// ── Nominatim rate-limit queue + search cache ─────────────────────────────────
+const geocodeQueue = { lastCall: 0, pending: false };
+
+const _nominatimThrottle = async () => {
+    // Serialize all Nominatim calls: wait until 1100ms after the previous one
     const now = Date.now();
-    const timeSinceLast = now - geocodeQueue.lastCall;
-    if (timeSinceLast < 1100) {
-        await new Promise(resolve => setTimeout(resolve, 1100 - timeSinceLast));
-    }
+    const wait = 1100 - (now - geocodeQueue.lastCall);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
     geocodeQueue.lastCall = Date.now();
+};
+
+// Cache: query string → array of result objects (max 60 entries)
+const _nominatimCache = new Map();
+const _cacheGet = (key) => _nominatimCache.get(key);
+const _cacheSet = (key, val) => {
+    if (_nominatimCache.size >= 60) {
+        // Evict oldest entry
+        _nominatimCache.delete(_nominatimCache.keys().next().value);
+    }
+    _nominatimCache.set(key, val);
+};
+
+const NOMINATIM_HEADERS = { 'User-Agent': 'nomad-atlas-app/1.0' };
+
+// Parse a Nominatim result into our structured place object
+const _parseNominatimResult = (item) => {
+    const addr = item.address || {};
+    const city    = addr.city || addr.town || addr.village || addr.municipality || addr.hamlet || '';
+    const state   = addr.state || addr.region || addr.county || '';
+    const country = addr.country || '';
+    const country_code = (addr.country_code || '').toUpperCase();
+
+    // Build a clean display name: "City, State, Country" skipping empty parts
+    const parts = [city, state, country].filter(Boolean);
+    const display_name = parts.length > 0 ? parts.join(', ') : item.display_name;
+
+    // Primary label shown in dropdown: "City, Country" (or just display_name)
+    const label = [city || state, country].filter(Boolean).join(', ') || display_name;
+
+    return {
+        display_name,
+        label,
+        city,
+        state,
+        country,
+        country_code,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        place_id: String(item.place_id),
+    };
+};
+
+// Search Nominatim — returns up to 5 structured place results
+const searchNominatim = async (query) => {
+    if (!query || query.trim().length < 2) return [];
+    const key = query.trim().toLowerCase();
+    const cached = _cacheGet(key);
+    if (cached) return cached;
+
+    await _nominatimThrottle();
     try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}&limit=1`);
-        const data = await response.json();
-        if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-    } catch (error) { console.error('Geocoding error:', error); }
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query.trim())}&limit=5&addressdetails=1`;
+        const res  = await fetch(url, { headers: NOMINATIM_HEADERS });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const results = data.map(_parseNominatimResult);
+        _cacheSet(key, results);
+        return results;
+    } catch (err) {
+        console.error('Nominatim search error:', err);
+        return null; // null signals network error (vs [] = no results)
+    }
+};
+
+// Single-place geocode (used for profile home + CSV import + DestinoCard save)
+const geocodePlace = async (place) => {
+    const results = await searchNominatim(place);
+    if (results && results.length > 0) {
+        const r = results[0];
+        return { lat: r.lat, lng: r.lng };
+    }
     return null;
 };
 
@@ -156,7 +224,18 @@ const deletePhotosFromStorage = async (trip) => {
 // Format destinations array into "Paris → London → Rome" subtitle
 const formatDestinations = (destinos) => {
     if (!destinos || destinos.length === 0) return '';
-    return destinos.map(d => d.lugar.split(',')[0].trim()).join(' \u2192 ');
+    return destinos.map(d => {
+        // Prefer city field, then the first part of lugar (trimmed), then lugar
+        if (d.city) return d.city;
+        return (d.lugar || '').split(',')[0].trim() || d.lugar;
+    }).join(' \u2192 ');
+};
+
+// Full display name: "Paris, France" using structured data when available
+const formatDestinationFull = (d) => {
+    if (d.city && d.country) return `${d.city}, ${d.country}`;
+    if (d.display_name) return d.display_name;
+    return d.lugar || '';
 };
 
 // Get the display name (trip_name, or fall back to joined destinations)
@@ -253,7 +332,14 @@ const parseCSVRows = (text) => {
             const destFechaFinal = getCol(values, 'destfechafinal', 'destinofechafinal') || fechaFinal;
             if (!fechaInicio) { errors.push({ row: i + 1, message: 'Falta fecha de inicio' }); continue; }
             if (!lugar) { errors.push({ row: i + 1, message: 'Falta lugar/destino' }); continue; }
-            rawEntries.push({ tripName, tripId, fechaInicio, fechaFinal, motivo, personas: personas ? personas.split(';').map(n => ({ nombre: n.trim(), foto: null })).filter(p => p.nombre) : [], notas, lugar, destFechaInicio, destFechaFinal, sourceRow: i + 1 });
+            const city         = getCol(values, 'city')         || '';
+            const state        = getCol(values, 'state')        || '';
+            const country      = getCol(values, 'country')      || '';
+            const country_code = getCol(values, 'country_code', 'countrycode') || '';
+            const csvLat       = parseFloat(getCol(values, 'lat'))  || null;
+            const csvLng       = parseFloat(getCol(values, 'lng'))  || null;
+            const place_id     = getCol(values, 'place_id', 'placeid') || null;
+            rawEntries.push({ tripName, tripId, fechaInicio, fechaFinal, motivo, personas: personas ? personas.split(';').map(n => ({ nombre: n.trim(), foto: null })).filter(p => p.nombre) : [], notas, lugar, city, state, country, country_code, csvLat, csvLng, place_id, destFechaInicio, destFechaFinal, sourceRow: i + 1 });
         } catch (e) { errors.push({ row: i + 1, message: 'Error de parseo: ' + e.message }); }
     }
     const tripMap = new Map();
@@ -263,7 +349,22 @@ const parseCSVRows = (text) => {
             tripMap.set(groupKey, { id: Date.now() + Math.floor(Math.random() * 10000), trip_name: entry.tripName || '', fechaInicio: entry.fechaInicio, fechaFinal: entry.fechaFinal, motivo: entry.motivo, personas: entry.personas, destinos: [], notas: entry.notas, createdAt: new Date().toISOString() });
         }
         const trip = tripMap.get(groupKey);
-        trip.destinos.push({ lugar: entry.lugar, fechaInicio: entry.destFechaInicio, fechaFinal: entry.destFechaFinal, foto: null, coordinates: null });
+        const hasCoords = entry.csvLat && entry.csvLng;
+        trip.destinos.push({
+            lugar:        entry.city || entry.lugar,
+            display_name: [entry.city, entry.state, entry.country].filter(Boolean).join(', ') || entry.lugar,
+            city:         entry.city         || '',
+            state:        entry.state        || '',
+            country:      entry.country      || '',
+            country_code: entry.country_code || '',
+            lat:          entry.csvLat       || null,
+            lng:          entry.csvLng       || null,
+            place_id:     entry.place_id     || null,
+            coordinates:  hasCoords ? { lat: entry.csvLat, lng: entry.csvLng } : null,
+            fechaInicio:  entry.destFechaInicio,
+            fechaFinal:   entry.destFechaFinal,
+            foto:         null,
+        });
         if (entry.notas && trip.notas && !trip.notas.includes(entry.notas)) { trip.notas = trip.notas + '; ' + entry.notas; }
         else if (entry.notas && !trip.notas) { trip.notas = entry.notas; }
     });
@@ -276,11 +377,30 @@ const geocodeTrips = async (trips, onProgress) => {
     const totalDestinations = trips.reduce((sum, t) => sum + t.destinos.length, 0);
     for (const trip of trips) {
         for (const destino of trip.destinos) {
-            if (!destino.coordinates) {
+            // Skip if we already have coordinates (e.g., imported from CSV with lat/lng)
+            if (!destino.coordinates && !destino.lat) {
                 try {
-                    destino.coordinates = await geocodePlace(destino.lugar);
-                    if (!destino.coordinates) errors.push({ lugar: destino.lugar, message: 'No se encontraron coordenadas' });
-                } catch (e) { errors.push({ lugar: destino.lugar, message: e.message }); }
+                    const results = await searchNominatim(destino.lugar);
+                    if (results && results.length > 0) {
+                        const r = results[0];
+                        destino.coordinates  = { lat: r.lat, lng: r.lng };
+                        destino.lat          = r.lat;
+                        destino.lng          = r.lng;
+                        // Only fill structured fields if not already set from CSV
+                        if (!destino.city)         destino.city         = r.city;
+                        if (!destino.state)        destino.state        = r.state;
+                        if (!destino.country)      destino.country      = r.country;
+                        if (!destino.country_code) destino.country_code = r.country_code;
+                        if (!destino.place_id)     destino.place_id     = r.place_id;
+                        if (!destino.display_name || destino.display_name === destino.lugar) {
+                            destino.display_name = r.display_name;
+                        }
+                    } else {
+                        errors.push({ lugar: destino.lugar, message: 'No se encontraron coordenadas' });
+                    }
+                } catch (e) {
+                    errors.push({ lugar: destino.lugar, message: e.message });
+                }
             }
             geocoded++;
             if (onProgress) onProgress(geocoded, totalDestinations);
@@ -506,7 +626,12 @@ const TripDetailModal = ({ trip, onClose, homeCoords, onDelete, onEdit }) => {
                             h('div', {key: index, style: {background: 'var(--light)', borderRadius: '12px', overflow: 'hidden', border: '2px solid var(--border)'}},
                                 destino.foto && h('img', {src: destino.foto, alt: destino.lugar, style: {width: '100%', height: '150px', objectFit: 'cover'}}),
                                 h('div', {style: {padding: '1rem'}},
-                                    h('div', {style: {fontSize: '1.1rem', fontWeight: '700', color: 'var(--secondary)', marginBottom: '0.5rem'}}, destino.lugar),
+                                    h('div', {style: {fontSize: '1.1rem', fontWeight: '700', color: 'var(--secondary)', marginBottom: '0.25rem'}},
+                                        destino.city || destino.lugar
+                                    ),
+                                    (destino.state || destino.country) && h('div', {style: {fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.35rem'}},
+                                        [destino.state, destino.country].filter(Boolean).join(', ')
+                                    ),
                                     destino.fechaInicio && h('div', {style: {fontSize: '0.85rem', color: '#666'}}, formatDateRange(destino.fechaInicio, destino.fechaFinal))
                                 )
                             )
@@ -528,6 +653,182 @@ const TripDetailModal = ({ trip, onClose, homeCoords, onDelete, onEdit }) => {
     );
 };
 
+// ── PlaceSearchInput ──────────────────────────────────────────────────────────
+// Autocomplete input + dropdown + chip list for destination selection
+const PlaceSearchInput = ({ selectedPlaces, onAdd, onRemove }) => {
+    const [query, setQuery]           = useState('');
+    const [results, setResults]       = useState([]);
+    const [loading, setLoading]       = useState(false);
+    const [networkErr, setNetworkErr] = useState(false);
+    const [open, setOpen]             = useState(false);
+    const debounceRef                 = useRef(null);
+    const wrapperRef                  = useRef(null);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleInput = (e) => {
+        const val = e.target.value;
+        setQuery(val);
+        setNetworkErr(false);
+
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+
+        if (!val.trim() || val.trim().length < 2) {
+            setResults([]);
+            setOpen(false);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+        debounceRef.current = setTimeout(async () => {
+            const res = await searchNominatim(val);
+            setLoading(false);
+            if (res === null) {
+                setNetworkErr(true);
+                setResults([]);
+            } else {
+                setResults(res);
+                setNetworkErr(false);
+            }
+            setOpen(true);
+        }, 400);
+    };
+
+    const handleSelect = (place) => {
+        // Avoid duplicates by place_id or display_name
+        const alreadyAdded = selectedPlaces.some(
+            p => (p.place_id && p.place_id === place.place_id) || p.display_name === place.display_name
+        );
+        if (!alreadyAdded) onAdd(place);
+        setQuery('');
+        setResults([]);
+        setOpen(false);
+    };
+
+    const handleKeyDown = (e) => {
+        // Allow pressing Enter to add free-text place when no dropdown is open
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (open && results.length > 0) {
+                handleSelect(results[0]);
+            } else if (query.trim().length > 0) {
+                // Free-text fallback: add ungeocoded destination
+                const freeText = query.trim();
+                const alreadyAdded = selectedPlaces.some(p => (p.display_name || p.lugar) === freeText);
+                if (!alreadyAdded) {
+                    onAdd({ display_name: freeText, label: freeText, city: '', state: '', country: '', country_code: '', lat: null, lng: null, place_id: null });
+                }
+                setQuery('');
+                setResults([]);
+                setOpen(false);
+            }
+        }
+        if (e.key === 'Escape') { setOpen(false); }
+    };
+
+    // Country code → flag emoji (optional, best-effort)
+    const toFlag = (cc) => {
+        if (!cc || cc.length !== 2) return '📍';
+        try {
+            return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)));
+        } catch { return '📍'; }
+    };
+
+    return (
+        h('div', { className: 'place-search-wrapper', ref: wrapperRef },
+
+            // ── Chips (selected places) ────────────────────────────────────────
+            selectedPlaces.length > 0 && (
+                h('div', { className: 'place-chips' },
+                    selectedPlaces.map((p, i) => (
+                        h('div', { key: i, className: 'place-chip' },
+                            h('span', { className: 'place-chip__flag' }, toFlag(p.country_code)),
+                            h('span', { className: 'place-chip__name' },
+                                p.city || p.display_name || p.lugar || '?'
+                            ),
+                            p.country && h('span', { className: 'place-chip__country' }, p.country),
+                            h('button', {
+                                type: 'button',
+                                className: 'place-chip__remove',
+                                onClick: () => onRemove(i),
+                                'aria-label': 'Eliminar destino'
+                            }, '×')
+                        )
+                    ))
+                )
+            ),
+
+            // ── Input ─────────────────────────────────────────────────────────
+            h('div', { className: 'place-search-input-row' },
+                h('input', {
+                    type: 'text',
+                    className: 'place-search-input',
+                    value: query,
+                    onChange: handleInput,
+                    onKeyDown: handleKeyDown,
+                    onFocus: () => { if (results.length > 0) setOpen(true); },
+                    placeholder: '🔍 Buscar ciudad, país...',
+                    autoComplete: 'off',
+                    autoCorrect: 'off',
+                    spellCheck: false,
+                }),
+                loading && h('div', { className: 'place-search-spinner' })
+            ),
+
+            // ── Dropdown ──────────────────────────────────────────────────────
+            open && (
+                h('div', { className: 'place-dropdown' },
+                    networkErr && (
+                        h('div', { className: 'place-dropdown__msg place-dropdown__error' },
+                            '⚠️ Sin conexión al servicio de búsqueda'
+                        )
+                    ),
+                    !networkErr && results.length === 0 && !loading && query.trim().length >= 2 && (
+                        h('div', { className: 'place-dropdown__msg' },
+                            'No se encontraron resultados. ',
+                            h('button', {
+                                type: 'button',
+                                className: 'place-dropdown__freetext',
+                                onClick: () => {
+                                    const freeText = query.trim();
+                                    if (!selectedPlaces.some(p => (p.display_name || p.lugar) === freeText)) {
+                                        onAdd({ display_name: freeText, label: freeText, city: '', state: '', country: '', country_code: '', lat: null, lng: null, place_id: null });
+                                    }
+                                    setQuery(''); setResults([]); setOpen(false);
+                                }
+                            }, 'Agregar "' + query.trim() + '" igualmente')
+                        )
+                    ),
+                    results.map((place, i) => (
+                        h('button', {
+                            key: i,
+                            type: 'button',
+                            className: 'place-dropdown__item',
+                            onClick: () => handleSelect(place),
+                        },
+                            h('span', { className: 'place-dropdown__flag' }, toFlag(place.country_code)),
+                            h('span', { className: 'place-dropdown__text' },
+                                h('span', { className: 'place-dropdown__primary' },
+                                    [place.city, place.state].filter(Boolean).join(', ') || place.display_name
+                                ),
+                                place.country && h('span', { className: 'place-dropdown__secondary' }, place.country)
+                            )
+                        )
+                    ))
+                )
+            )
+        )
+    );
+};
+
 const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, setIsGeocoding, uploadPhoto }) => {
     const [isEditing, setIsEditing] = useState(!!destino._isNew);
     const [local, setLocal] = useState({ ...destino });
@@ -540,9 +841,9 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const compressed = await compressImage(reader.result, 800, 0.6);
-                setLocalPreview(compressed);                              // instant preview while upload runs
+                setLocalPreview(compressed);
                 const url = uploadPhoto ? await uploadPhoto(compressed) : null;
-                const fotoValue = url || compressed;                      // fallback to base64 on upload failure
+                const fotoValue = url || compressed;
                 setLocal(prev => ({ ...prev, foto: fotoValue }));
                 setLocalPreview(fotoValue);
             };
@@ -553,9 +854,19 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
     const handleSave = async () => {
         if (!local.lugar) return;
         setIsGeocoding(true);
-        const coordinates = local.coordinates || await geocodePlace(local.lugar);
+        // Only geocode if we don't already have coordinates from autocomplete
+        let coordinates = local.coordinates;
+        if (!coordinates && local.lat && local.lng) {
+            coordinates = { lat: local.lat, lng: local.lng };
+        }
+        if (!coordinates) {
+            coordinates = await geocodePlace(local.lugar);
+        }
         const { _isNew, ...rest } = local;
-        onSave(index, { ...rest, coordinates });
+        // Merge coordinates into lat/lng fields as well for consistency
+        const saved = { ...rest, coordinates };
+        if (coordinates && !saved.lat) { saved.lat = coordinates.lat; saved.lng = coordinates.lng; }
+        onSave(index, saved);
         setIsEditing(false);
         setIsGeocoding(false);
     };
@@ -567,11 +878,25 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
         setIsEditing(false);
     };
 
+    // Display label for the view mode header
+    const displayLabel = local.display_name || local.lugar || '';
+    const cityLine = local.city
+        ? [local.city, local.country].filter(Boolean).join(', ')
+        : local.lugar;
+
     if (isEditing) {
         return (
             h('div', {className: 'destination-item', style: {borderColor: 'var(--primary)'}},
+                // Show current place if already set (from autocomplete chip selection)
+                local.lugar && (
+                    h('div', {className: 'destino-card-place-set'},
+                        h('span', {className: 'destino-card-place-name'}, '📍 ', cityLine),
+                        local.country_code && h('span', {className: 'destino-card-place-flag'},
+                            String.fromCodePoint(...[...(local.country_code || '').toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)).filter(n => n >= 0x1F1E6))
+                        )
+                    )
+                ),
                 h('div', {className: 'form-grid'},
-                    h('div', {className: 'form-group'}, h('label', null, 'Lugar *'), h('input', {type: 'text', value: local.lugar, onChange: (e) => setLocal({...local, lugar: e.target.value}), placeholder: 'Par\u00eds, Francia'})),
                     h('div', {className: 'form-group'}, h('label', null, 'Fecha inicio'), h('input', {type: 'date', value: local.fechaInicio || '', onChange: (e) => setLocal({...local, fechaInicio: e.target.value}), min: formData.fechaInicio, max: formData.fechaFinal || undefined})),
                     h('div', {className: 'form-group'}, h('label', null, 'Fecha final'), h('input', {type: 'date', value: local.fechaFinal || '', onChange: (e) => setLocal({...local, fechaFinal: e.target.value}), min: local.fechaInicio || formData.fechaInicio, max: formData.fechaFinal || undefined})),
                     h('div', {className: 'form-group'},
@@ -596,7 +921,19 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
     return (
         h('div', {className: 'destination-item'},
             h('button', {type: 'button', className: 'btn-remove', onClick: () => onRemove(index)}, '\u00d7'),
-            h('h4', null, '📍 ', destino.lugar),
+            h('div', {style: {display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem'}},
+                h('h4', {style: {margin: 0}}, '📍 ', cityLine),
+                destino.country && destino.city && (
+                    h('span', {style: {fontSize: '0.8rem', color: 'var(--text-muted)'}},
+                        destino.state ? `(${destino.state})` : ''
+                    )
+                )
+            ),
+            destino.country && destino.city && (
+                h('div', {style: {fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem'}},
+                    destino.country
+                )
+            ),
             (destino.fechaInicio || destino.fechaFinal) && h('p', {style: {fontSize: '0.9rem', color: '#666', marginBottom: '0.5rem'}}, formatDateRange(destino.fechaInicio, destino.fechaFinal)),
             destino.foto && h('img', {src: destino.foto, alt: destino.lugar, className: 'image-preview'}),
             h('button', {type: 'button', className: 'btn-edit-destino', onClick: () => setIsEditing(true)}, '✏️ Editar')
@@ -606,9 +943,6 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
 
 const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCancelEdit, existingTrips, showToast, onImportTrips, uploadPhoto }) => {
     const [formData, setFormData] = useState(editingTrip || { trip_name: '', fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
-    const [destinationsText, setDestinationsText] = useState(
-        editingTrip ? (editingTrip.destinos || []).map(d => d.lugar).join(', ') : ''
-    );
     const [currentPerson, setCurrentPerson] = useState({ nombre: '', foto: null });
     const [personPreviewUrl, setPersonPreviewUrl] = useState(null);
     const [isGeocoding, setIsGeocoding] = useState(false);
@@ -616,7 +950,6 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
     useEffect(() => {
         if (editingTrip) {
             setFormData(editingTrip);
-            setDestinationsText((editingTrip.destinos || []).map(d => d.lugar).join(', '));
         }
     }, [editingTrip]);
 
@@ -637,9 +970,9 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const compressed = await compressImage(reader.result, 200, 0.7);
-                setPersonPreviewUrl(compressed);                              // instant preview
+                setPersonPreviewUrl(compressed);
                 const url = uploadPhoto ? await uploadPhoto(compressed) : null;
-                const fotoValue = url || compressed;                          // fallback to base64
+                const fotoValue = url || compressed;
                 setCurrentPerson(prev => ({ ...prev, foto: fotoValue }));
                 setPersonPreviewUrl(fotoValue);
             };
@@ -654,39 +987,62 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
         showToast(msg, 'success');
     };
 
+    // Convert a PlaceSearchInput result into a destino stub
+    const placeToDestino = (place) => ({
+        lugar:        place.city || place.display_name || place.label,
+        display_name: place.display_name,
+        city:         place.city         || '',
+        state:        place.state        || '',
+        country:      place.country      || '',
+        country_code: place.country_code || '',
+        lat:          place.lat          || null,
+        lng:          place.lng          || null,
+        place_id:     place.place_id     || null,
+        coordinates:  (place.lat && place.lng) ? { lat: place.lat, lng: place.lng } : null,
+        fechaInicio:  '',
+        fechaFinal:   '',
+        foto:         null,
+    });
 
-    // Build destinos stubs from the quick-entry text, merging with any fully-edited cards
-    const buildDestinos = () => {
-        const textPlaces = destinationsText.split(',').map(s => s.trim()).filter(Boolean);
-        if (textPlaces.length === 0) return formData.destinos;
-        // For each place in the text field, keep an existing DestinoCard if the lugar matches,
-        // otherwise create a stub. Append any DestinoCards not mentioned in the text field.
-        const merged = textPlaces.map(lugar => {
-            const existing = formData.destinos.find(d => d.lugar === lugar);
-            return existing || { lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: null };
-        });
-        formData.destinos.forEach(d => {
-            if (!textPlaces.includes(d.lugar)) merged.push(d);
-        });
-        return merged;
+    // The "selected places" for PlaceSearchInput is derived from formData.destinos
+    const selectedPlaces = formData.destinos.map(d => ({
+        display_name: d.display_name || d.lugar,
+        label:        d.display_name || d.lugar,
+        city:         d.city         || '',
+        state:        d.state        || '',
+        country:      d.country      || '',
+        country_code: d.country_code || '',
+        lat:          d.lat          || (d.coordinates && d.coordinates.lat) || null,
+        lng:          d.lng          || (d.coordinates && d.coordinates.lng) || null,
+        place_id:     d.place_id     || null,
+    }));
+
+    const handlePlaceAdd = (place) => {
+        const newDest = placeToDestino(place);
+        setFormData(prev => ({ ...prev, destinos: [...prev.destinos, newDest] }));
+    };
+
+    const handlePlaceRemove = (idx) => {
+        setFormData(prev => ({ ...prev, destinos: prev.destinos.filter((_, i) => i !== idx) }));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.trip_name.trim()) { showToast('El nombre del viaje es obligatorio', 'warning'); return; }
-        const finalDestinos = buildDestinos();
-        if (finalDestinos.length === 0) { showToast('Agrega al menos un destino', 'warning'); return; }
-        const tripData = { ...formData, trip_name: formData.trip_name.trim(), destinos: finalDestinos };
+        if (formData.destinos.length === 0) { showToast('Agrega al menos un destino', 'warning'); return; }
+        const tripData = { ...formData, trip_name: formData.trip_name.trim() };
         const trip = editingTrip ? tripData : { ...tripData, id: Date.now(), createdAt: new Date().toISOString() };
         onAddTrip(trip);
         if (!editingTrip) {
             setFormData({ trip_name: '', fechaInicio: '', fechaFinal: '', motivo: 'placer', personas: [], destinos: [], notas: '' });
-            setDestinationsText('');
         }
     };
 
     const suggestedPeople = allPeople.filter(p => !formData.personas.some(fp => fp.nombre === p.nombre));
-    const savedDestinations = allDestinations.filter(d => !formData.destinos.some(fd => fd.lugar === d.lugar));
+    // Saved destinations from previous trips (excluding already-added ones) as quick-add chips
+    const savedDestinations = allDestinations.filter(d =>
+        !formData.destinos.some(fd => fd.lugar === d.lugar || fd.display_name === d.display_name)
+    );
 
     return (
         h('div', {className: 'add-trip-section'},
@@ -702,7 +1058,7 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
             h('form', {onSubmit: handleSubmit},
                 h('div', {className: 'form-section'},
                     h('h3', {className: 'form-section-title'}, 'Informaci\u00f3n General'),
-                    // ── Trip name (primary identifier) ──────────────────────────
+                    // ── Trip name ───────────────────────────────────────────────
                     h('div', {className: 'form-group', style: {marginBottom: '1.25rem'}},
                         h('label', {style: {fontSize: '1rem', fontWeight: '700', color: 'var(--secondary)'}}, 'Nombre del viaje *'),
                         h('input', {
@@ -713,33 +1069,6 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                             required: true,
                             style: {fontSize: '1.05rem'}
                         })
-                    ),
-                    // ── Destinations quick-entry ────────────────────────────────
-                    h('div', {className: 'form-group', style: {marginBottom: '1.25rem'}},
-                        h('label', null, 'Destinos'),
-                        h('input', {
-                            type: 'text',
-                            value: destinationsText,
-                            onChange: (e) => {
-                                const val = e.target.value;
-                                setDestinationsText(val);
-                                // Sync stubs into formData.destinos as user types
-                                const places = val.split(',').map(s => s.trim()).filter(Boolean);
-                                const newDestinos = places.map(lugar => {
-                                    const existing = formData.destinos.find(d => d.lugar === lugar);
-                                    return existing || { lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: null };
-                                });
-                                // Preserve fully-edited cards not in the text field
-                                formData.destinos.forEach(d => {
-                                    if (!places.includes(d.lugar)) newDestinos.push(d);
-                                });
-                                setFormData(prev => ({ ...prev, destinos: newDestinos }));
-                            },
-                            placeholder: 'Ej: Par\u00eds, Londres, Roma  (separados por coma)'
-                        }),
-                        h('div', {style: {fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.3rem'}},
-                            'Escrib\u00ed los destinos separados por coma. Pod\u00e9s agregar fechas y fotos por destino abajo.'
-                        )
                     ),
                     h('div', {className: 'form-grid'},
                         h('div', {className: 'form-group'}, h('label', null, 'Fecha Inicio *'), h('input', {type: 'date', value: formData.fechaInicio, onChange: (e) => setFormData({ ...formData, fechaInicio: e.target.value }), required: true})),
@@ -761,45 +1090,82 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                 h('div', {className: 'form-section'},
                     h('h3', {className: 'form-section-title'}, 'Destinos'),
 
+                    // ── Place autocomplete ──────────────────────────────────────
+                    h('div', {className: 'form-group', style: {marginBottom: '1rem'}},
+                        h('label', null, 'Buscar y agregar destinos'),
+                        h(PlaceSearchInput, {
+                            selectedPlaces: selectedPlaces,
+                            onAdd:    handlePlaceAdd,
+                            onRemove: handlePlaceRemove,
+                        }),
+                        h('div', {style: {fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem'}},
+                            'Buscá ciudades o países. Seleccioná del desplegable para guardar ubicación exacta.'
+                        )
+                    ),
+
+                    // ── Saved destinations quick-add ────────────────────────────
                     savedDestinations.length > 0 && (
                         h('div', {style: {marginBottom: '1rem'}},
-                            h('label', null, 'Seleccionar destino guardado:'),
-                            h('div', {className: 'suggested-people'},
+                            h('label', {style: {fontSize: '0.85rem', color: 'var(--text-muted)'}}, 'Destinos previos:'),
+                            h('div', {className: 'suggested-people', style: {marginTop: '0.4rem'}},
                                 savedDestinations.slice(0, 10).map(dest => (
-                                    h('div', {key: dest.lugar, className: 'suggested-person', onClick: () => {
-                                        const newDest = { lugar: dest.lugar, fechaInicio: '', fechaFinal: '', foto: null, coordinates: dest.coordinates };
-                                        setFormData(prev => ({ ...prev, destinos: [...prev.destinos, newDest] }));
-                                        setDestinationsText(prev => prev ? prev + ', ' + dest.lugar : dest.lugar);
-                                    }}, '📍 ', dest.lugar)
+                                    h('div', {
+                                        key: dest.lugar,
+                                        className: 'suggested-person',
+                                        onClick: () => {
+                                            const newDest = {
+                                                lugar:        dest.lugar,
+                                                display_name: dest.display_name || dest.lugar,
+                                                city:         dest.city         || '',
+                                                state:        dest.state        || '',
+                                                country:      dest.country      || '',
+                                                country_code: dest.country_code || '',
+                                                lat:          dest.lat          || null,
+                                                lng:          dest.lng          || null,
+                                                place_id:     dest.place_id     || null,
+                                                coordinates:  dest.coordinates  || null,
+                                                fechaInicio:  '',
+                                                fechaFinal:   '',
+                                                foto:         null,
+                                            };
+                                            setFormData(prev => ({ ...prev, destinos: [...prev.destinos, newDest] }));
+                                        }
+                                    },
+                                    dest.country_code
+                                        ? String.fromCodePoint(...[...(dest.country_code||'').toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+                                        : '📍',
+                                    ' ', dest.city || dest.lugar,
+                                    dest.country ? h('span', {style: {opacity: 0.7, marginLeft: '0.25rem', fontSize: '0.8em'}}, dest.country) : null
+                                    )
                                 ))
                             )
                         )
                     ),
 
-                    h('div', {className: 'destinations-list'},
-                        formData.destinos.map((destino, index) => (
-                            h(DestinoCard, {key: index, destino: destino, index: index, formData: formData,
-                                onSave: (idx, updated) => {
-                                    const nd = [...formData.destinos];
-                                    nd[idx] = updated;
-                                    setFormData(prev => ({...prev, destinos: nd}));
-                                    setDestinationsText(nd.map(d => d.lugar).filter(Boolean).join(', '));
-                                },
-                                onRemove: (idx) => {
-                                    const nd = formData.destinos.filter((_, i) => i !== idx);
-                                    setFormData(prev => ({...prev, destinos: nd}));
-                                    setDestinationsText(nd.map(d => d.lugar).filter(Boolean).join(', '));
-                                },
-                                isGeocoding: isGeocoding, setIsGeocoding: setIsGeocoding, uploadPhoto: uploadPhoto
-                            })
-                        ))
-                    ),
-
-                    h('div', {className: 'destination-item', style: {border: '2px dashed var(--border)', cursor: 'pointer', textAlign: 'center', padding: '1.5rem'},
-                        onClick: () => {
-                            setFormData(prev => ({...prev, destinos: [...prev.destinos, { lugar: '', fechaInicio: '', fechaFinal: '', foto: null, coordinates: null, _isNew: true }]}));
-                        }},
-                        h('span', {style: {fontSize: '1.1rem', color: 'var(--secondary)', fontWeight: '600'}}, '➕ Agregar Destino')
+                    // ── DestinoCards (dates + photos per destination) ────────────
+                    formData.destinos.length > 0 && (
+                        h('div', {className: 'destinations-list'},
+                            formData.destinos.map((destino, index) => (
+                                h(DestinoCard, {
+                                    key: destino.place_id || destino.display_name || destino.lugar || index,
+                                    destino: destino,
+                                    index: index,
+                                    formData: formData,
+                                    onSave: (idx, updated) => {
+                                        const nd = [...formData.destinos];
+                                        nd[idx] = updated;
+                                        setFormData(prev => ({...prev, destinos: nd}));
+                                    },
+                                    onRemove: (idx) => {
+                                        const nd = formData.destinos.filter((_, i) => i !== idx);
+                                        setFormData(prev => ({...prev, destinos: nd}));
+                                    },
+                                    isGeocoding: isGeocoding,
+                                    setIsGeocoding: setIsGeocoding,
+                                    uploadPhoto: uploadPhoto,
+                                })
+                            ))
+                        )
                     )
                 ),
 
@@ -1118,8 +1484,17 @@ const DashboardView = ({ trips, homeCoords }) => {
     const tripsPerMonth = (totalTrips / monthSpan).toFixed(1);
 
     // --- Geography ---
+    // Use city field if available, fall back to lugar for grouping/display
     const placeCount = {};
-    allDest.forEach(d => { placeCount[d.lugar] = (placeCount[d.lugar] || 0) + 1; });
+    const placeDisplay = {}; // stores best display name per key
+    allDest.forEach(d => {
+        const key = d.city || d.lugar;
+        if (!key) return;
+        placeCount[key] = (placeCount[key] || 0) + 1;
+        // Build display: "City, Country" if available
+        const display = d.city && d.country ? `${d.city}, ${d.country}` : (d.display_name || d.lugar);
+        if (!placeDisplay[key]) placeDisplay[key] = display;
+    });
     const placeEntries = Object.entries(placeCount).sort((a, b) => b[1] - a[1]);
     const topDestinations = placeEntries.slice(0, 5);
 
@@ -1134,13 +1509,38 @@ const DashboardView = ({ trips, homeCoords }) => {
     }
     const worldLaps = (furthest.km / 40075).toFixed(1);
 
-    // Country & continent
+    // Country & continent — use structured data, fall back to string-parsing lugar
     const countryCount = {};
-    allDest.forEach(d => { if (d.pais) countryCount[d.pais] = (countryCount[d.pais] || 0) + 1; });
+    allDest.forEach(d => {
+        let country = d.country || '';
+        if (!country && d.lugar) {
+            const parts = d.lugar.split(',');
+            country = parts[parts.length - 1].trim();
+        }
+        if (country) countryCount[country] = (countryCount[country] || 0) + 1;
+    });
     const topCountry = Object.entries(countryCount).sort((a, b) => b[1] - a[1])[0];
+    const uniqueCountries = Object.keys(countryCount).sort();
+    const uniqueCountriesCount = uniqueCountries.length;
 
+    // City counts (unique cities visited)
+    const cityCount = {};
+    allDest.forEach(d => {
+        const city = d.city || (d.lugar ? d.lugar.split(',')[0].trim() : '');
+        if (city) cityCount[city] = (cityCount[city] || 0) + 1;
+    });
+    const uniqueCitiesCount = Object.keys(cityCount).length;
+
+    // Continent mapping from country_code
+    const CONTINENT_MAP = {
+        AF:'África', AX:'Europa', AL:'Europa', DZ:'África', AD:'Europa', AO:'África', AG:'América', AR:'América', AM:'Asia', AU:'Oceanía', AT:'Europa', AZ:'Asia', BS:'América', BH:'Asia', BD:'Asia', BB:'América', BY:'Europa', BE:'Europa', BZ:'América', BJ:'África', BT:'Asia', BO:'América', BA:'Europa', BW:'África', BR:'América', BN:'Asia', BG:'Europa', BF:'África', BI:'África', CV:'África', KH:'Asia', CM:'África', CA:'América', CF:'África', TD:'África', CL:'América', CN:'Asia', CO:'América', KM:'África', CG:'África', CD:'África', CR:'América', CI:'África', HR:'Europa', CU:'América', CY:'Europa', CZ:'Europa', DK:'Europa', DJ:'África', DM:'América', DO:'América', EC:'América', EG:'África', SV:'América', GQ:'África', ER:'África', EE:'Europa', SZ:'África', ET:'África', FJ:'Oceanía', FI:'Europa', FR:'Europa', GA:'África', GM:'África', GE:'Asia', DE:'Europa', GH:'África', GR:'Europa', GD:'América', GT:'América', GN:'África', GW:'África', GY:'América', HT:'América', HN:'América', HU:'Europa', IS:'Europa', IN:'Asia', ID:'Asia', IR:'Asia', IQ:'Asia', IE:'Europa', IL:'Asia', IT:'Europa', JM:'América', JP:'Asia', JO:'Asia', KZ:'Asia', KE:'África', KI:'Oceanía', KW:'Asia', KG:'Asia', LA:'Asia', LV:'Europa', LB:'Asia', LS:'África', LR:'África', LY:'África', LI:'Europa', LT:'Europa', LU:'Europa', MG:'África', MW:'África', MY:'Asia', MV:'Asia', ML:'África', MT:'Europa', MH:'Oceanía', MR:'África', MU:'África', MX:'América', FM:'Oceanía', MD:'Europa', MC:'Europa', MN:'Asia', ME:'Europa', MA:'África', MZ:'África', MM:'Asia', NA:'África', NR:'Oceanía', NP:'Asia', NL:'Europa', NZ:'Oceanía', NI:'América', NE:'África', NG:'África', NO:'Europa', OM:'Asia', PK:'Asia', PW:'Oceanía', PA:'América', PG:'Oceanía', PY:'América', PE:'América', PH:'Asia', PL:'Europa', PT:'Europa', QA:'Asia', RO:'Europa', RU:'Europa', RW:'África', KN:'América', LC:'América', VC:'América', WS:'Oceanía', SM:'Europa', ST:'África', SA:'Asia', SN:'África', RS:'Europa', SC:'África', SL:'África', SG:'Asia', SK:'Europa', SI:'Europa', SB:'Oceanía', SO:'África', ZA:'África', SS:'África', ES:'Europa', LK:'Asia', SD:'África', SR:'América', SE:'Europa', CH:'Europa', SY:'Asia', TW:'Asia', TJ:'Asia', TZ:'África', TH:'Asia', TL:'Asia', TG:'África', TO:'Oceanía', TT:'América', TN:'África', TR:'Asia', TM:'Asia', TV:'Oceanía', UG:'África', UA:'Europa', AE:'Asia', GB:'Europa', US:'América', UY:'América', UZ:'Asia', VU:'Oceanía', VE:'América', VN:'Asia', YE:'Asia', ZM:'África', ZW:'África',
+    };
     const continentCount = {};
-    allDest.forEach(d => { if (d.continente) continentCount[d.continente] = (continentCount[d.continente] || 0) + 1; });
+    allDest.forEach(d => {
+        const cc = (d.country_code || '').toUpperCase();
+        const continent = cc ? (CONTINENT_MAP[cc] || '') : '';
+        if (continent) continentCount[continent] = (continentCount[continent] || 0) + 1;
+    });
     const topContinent = Object.entries(continentCount).sort((a, b) => b[1] - a[1])[0];
 
     // --- Social / Company ---
@@ -1228,21 +1628,29 @@ const DashboardView = ({ trips, homeCoords }) => {
 
             /* === R2-3 RIGHT: MOST VISITED DESTINATIONS (2×2) === */
             h('div', {className: 'bento-card bento-mostvisited'},
-                h('div', {className: 'bento-label'}, 'Destinos mas visitados'),
+                h('div', {className: 'bento-label'}, 'Destinos m\u00e1s visitados'),
                 h('div', {className: 'bento-top-list'},
-                    topDestinations.map(([name, count]) => (
-                        h('div', {key: name, className: 'bento-top-item'},
-                            h('span', null, name),
+                    topDestinations.map(([key, count]) => (
+                        h('div', {key: key, className: 'bento-top-item'},
+                            h('span', null, placeDisplay[key] || key),
                             h('span', {className: 'bento-top-count'}, count)
                         )
                     ))
                 )
             ),
 
-            /* === R4-5 RIGHT: Top Country (2×2) === */
+            /* === R4-5 RIGHT: Top Country + Countries breakdown (2×2) === */
             h('div', {className: 'bento-card bento-topcountry'},
                 h('div', {className: 'bento-value-sm'}, topCountry ? topCountry[0] : '-'),
-                h('div', {className: 'bento-label'}, 'Top pais')
+                h('div', {className: 'bento-label'}, 'Top pa\u00eds'),
+                uniqueCountriesCount > 0 && h('div', {className: 'bento-sub', style: {marginTop: '0.5rem', fontSize: '0.8rem', lineHeight: '1.4', opacity: 0.85}},
+                    '🌍 ', uniqueCountriesCount, ' pa\u00eds', uniqueCountriesCount !== 1 ? 'es' : '',
+                    uniqueCitiesCount > 0 && ` · 🏙️ ${uniqueCitiesCount} ciudad`, uniqueCitiesCount !== 1 ? 'es' : ''
+                ),
+                uniqueCountriesCount > 1 && h('div', {className: 'bento-sub', style: {fontSize: '0.75rem', opacity: 0.7, marginTop: '0.25rem', lineHeight: '1.5'}},
+                    uniqueCountries.slice(0, 6).join(', '),
+                    uniqueCountries.length > 6 ? ` +${uniqueCountries.length - 6}` : ''
+                )
             ),
 
             /* === R5: Avg Trip (2×1) === */
@@ -1512,9 +1920,11 @@ const TripsCarousel = ({ trips, onEditTrip, onDeleteTrip }) => {
                 const duracion      = trip.fechaFinal
                     ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / 86400000) : 1;
                 const uniqueCountries = [...new Set(trip.destinos.map(d => {
-                    const parts = d.lugar.split(',');
+                    // Use structured country field if available
+                    if (d.country) return d.country;
+                    const parts = (d.lugar || '').split(',');
                     return parts[parts.length - 1].trim();
-                }))].length;
+                }).filter(Boolean))].length;
 
                 return h('div', {
                     key: trip.id,
@@ -1602,7 +2012,11 @@ const TripsCarousel = ({ trips, onEditTrip, onDeleteTrip }) => {
                             trip.destinos.map((d, i) =>
                                 h('div', {key: i, className: 'carousel-exp__dest'},
                                     h(Icon, {name: 'pin', size: 12, color: 'var(--primary)', strokeWidth: 2}),
-                                    h('span', null, d.lugar)
+                                    h('span', null,
+                                        d.city && d.country
+                                            ? `${d.city}, ${d.country}`
+                                            : (d.display_name || d.lugar)
+                                    )
                                 )
                             )
                         ),
@@ -1657,15 +2071,20 @@ const tripToDb = (trip, userId) => {
     const days = trip.fechaFinal
         ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / 86400000)
         : 1;
+    // Use structured country field if available; fall back to string-parsing lugar
     const countries = new Set(
         (trip.destinos || []).map(d => {
+            if (d.country) return d.country;
             const parts = (d.lugar || '').split(',');
             return parts[parts.length - 1].trim();
-        })
+        }).filter(Boolean)
     ).size;
-    // Use explicit trip_name if set; fall back to joined destinations
+    const cities = new Set(
+        (trip.destinos || []).map(d => d.city || d.lugar || '').filter(Boolean)
+    ).size;
+    // Use explicit trip_name if set; fall back to joined destination city names
     const tripName = (trip.trip_name || '').trim()
-        || (trip.destinos || []).map(d => d.lugar).join(' → ')
+        || (trip.destinos || []).map(d => d.city || d.lugar).filter(Boolean).join(' → ')
         || null;
     return {
         user_id:           userId,
@@ -1677,7 +2096,7 @@ const tripToDb = (trip, userId) => {
         notas:             trip.notas        || null,
         trip_name:         tripName,
         days_count:        days,
-        cities_visited:    (trip.destinos || []).length,
+        cities_visited:    cities,
         countries_visited: countries,
     };
 };
@@ -2069,12 +2488,36 @@ const App = () => {
     };
 
     const handleExportCSV = () => {
-        const header = 'tripName,tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,destFechaInicio,destFechaFinal';
+        const header = 'tripName,tripId,tripFechaInicio,tripFechaFinal,motivo,personas,notas,lugar,city,state,country,country_code,lat,lng,place_id,destFechaInicio,destFechaFinal';
         const rows = [];
         trips.forEach((trip, tripIndex) => {
             trip.destinos.forEach(dest => {
-                const escapeCsv = (val) => { const str = String(val || ''); return str.includes(',') || str.includes('"') || str.includes('\n') ? '"' + str.replace(/"/g, '""') + '"' : str; };
-                rows.push([escapeCsv(getTripName(trip)), tripIndex + 1, trip.fechaInicio, trip.fechaFinal || '', trip.motivo, trip.personas.map(p => p.nombre).join('; '), escapeCsv(trip.notas), escapeCsv(dest.lugar), dest.fechaInicio || '', dest.fechaFinal || ''].join(','));
+                const escapeCsv = (val) => {
+                    const str = String(val === null || val === undefined ? '' : val);
+                    return str.includes(',') || str.includes('"') || str.includes('\n')
+                        ? '"' + str.replace(/"/g, '""') + '"' : str;
+                };
+                const lat = dest.lat || (dest.coordinates && dest.coordinates.lat) || '';
+                const lng = dest.lng || (dest.coordinates && dest.coordinates.lng) || '';
+                rows.push([
+                    escapeCsv(getTripName(trip)),
+                    tripIndex + 1,
+                    trip.fechaInicio,
+                    trip.fechaFinal || '',
+                    trip.motivo,
+                    trip.personas.map(p => p.nombre).join('; '),
+                    escapeCsv(trip.notas),
+                    // lugar: use city for readability, fall back to lugar
+                    escapeCsv(dest.city || dest.lugar),
+                    escapeCsv(dest.city || ''),
+                    escapeCsv(dest.state || ''),
+                    escapeCsv(dest.country || ''),
+                    escapeCsv(dest.country_code || ''),
+                    lat, lng,
+                    escapeCsv(dest.place_id || ''),
+                    dest.fechaInicio || '',
+                    dest.fechaFinal  || '',
+                ].join(','));
             });
         });
         const csv = header + '\n' + rows.join('\n');
@@ -2167,7 +2610,21 @@ const App = () => {
     };
 
     const allPeople = [...new Map(trips.flatMap(t => t.personas).map(p => [p.nombre, p])).values()];
-    const allDestinations = [...new Map(trips.flatMap(t => t.destinos).map(d => [d.lugar, { lugar: d.lugar, coordinates: d.coordinates }])).values()];
+    const allDestinations = [...new Map(trips.flatMap(t => t.destinos).map(d => [
+        d.place_id || d.display_name || d.lugar,
+        {
+            lugar:        d.lugar,
+            display_name: d.display_name || d.lugar,
+            city:         d.city         || '',
+            state:        d.state        || '',
+            country:      d.country      || '',
+            country_code: d.country_code || '',
+            lat:          d.lat          || null,
+            lng:          d.lng          || null,
+            place_id:     d.place_id     || null,
+            coordinates:  d.coordinates  || null,
+        }
+    ])).values()];
     const availableYears = [...new Set(trips.map(t => new Date(t.fechaInicio).getFullYear()))].sort((a, b) => b - a);
     const filteredTrips = selectedYear === 'all' ? trips : trips.filter(t => new Date(t.fechaInicio).getFullYear() === parseInt(selectedYear));
 

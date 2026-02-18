@@ -1,5 +1,118 @@
 # Changelog
 
+## 2026-02-18 — Place autocomplete + structured location data (Nominatim)
+
+### What changed
+
+Replaced the free-text comma-entry destinations input with a full place autocomplete powered by the Nominatim/OpenStreetMap API. Each destination now stores rich structured location data instead of just a plain string.
+
+### New destination data structure
+
+```js
+{
+  lugar:        "Paris",            // backward-compat primary key
+  display_name: "Paris, Île-de-France, France",
+  city:         "Paris",
+  state:        "Île-de-France",
+  country:      "France",
+  country_code: "FR",
+  lat:          48.8566,
+  lng:          2.3522,
+  place_id:     "123456",
+  coordinates:  { lat: 48.8566, lng: 2.3522 },  // kept for map compat
+  fechaInicio:  "...",
+  fechaFinal:   "...",
+  foto:         null,
+}
+```
+
+Old trips with string-only destinations remain fully backward compatible.
+
+### Nominatim API integration
+
+- Endpoint: `https://nominatim.openstreetmap.org/search?format=json&q=...&limit=5&addressdetails=1`
+- `User-Agent: nomad-atlas-app/1.0` header on all requests (required by ToS)
+- **Rate limiting:** `_nominatimThrottle()` ensures ≥ 1100ms between calls (serial queue using `geocodeQueue.lastCall`)
+- **400ms debounce** on keystroke input before firing a search
+- **LRU-ish cache:** `_nominatimCache` (Map, max 60 entries) stores results per query — repeat searches never hit the API
+- Graceful degradation: network error → "Sin conexión" message, no results → "No se encontraron resultados" + free-text fallback
+- Free-text fallback: pressing Enter or clicking "Agregar igualmente" adds an ungeocoded destination (coordinates null)
+
+### New `PlaceSearchInput` component
+
+- Search input with 400ms debounce + loading spinner
+- Dropdown with flag emoji + "City, State" primary + "Country" secondary
+- Flag emojis computed from `country_code` via Unicode regional indicator trick
+- Selected destinations shown as removable chips: `🇫🇷 Paris · France ×`
+- Outside-click closes dropdown
+- Escape closes dropdown
+- Enter selects first result (or adds free text)
+- Duplicate prevention by `place_id` or `display_name`
+
+### Form changes (`AddTripForm`)
+
+- **Removed:** comma-separated quick-entry text field + `destinationsText` state
+- **Added:** `PlaceSearchInput` as the primary destination entry method
+- Saved destinations from previous trips shown as quick-add chips (with flag + country)
+- `DestinoCard` edit mode: location section removed from edit form (place set via autocomplete); shows locked "place header" badge with city + flag
+- `DestinoCard` view mode: shows city, state, country separately with cleaner layout
+- `buildDestinos()` helper removed (no longer needed)
+
+### Display updates
+
+| Location | Before | After |
+|---|---|---|
+| Carousel destinations | `lugar.split(',')[0]` | `d.city \|\| d.lugar` |
+| Carousel expanded dests | `d.lugar` | `"City, Country"` |
+| Trip detail modal cards | `d.lugar` only | City + `State, Country` on separate line |
+| `formatDestinations()` | `lugar.split(',')[0]` | `d.city \|\| d.lugar` |
+| Dashboard Most Visited | `d.lugar` | `"City, Country"` |
+| Dashboard Top Country | string-parse fallback | real `d.country` field |
+| Dashboard Top Continent | `d.continente` (unused) | mapped from `country_code` via `CONTINENT_MAP` |
+| Dashboard bento-topcountry | name only | name + "X países · Y ciudades" + country list |
+
+### Continent mapping
+
+Added `CONTINENT_MAP` object (ISO 3166-1 alpha-2 → continent name in Spanish) covering 195 countries. Maps `country_code` to América / Europa / Asia / África / Oceanía.
+
+### Dashboard geography improvements
+
+- `uniqueCountriesCount` — count of distinct countries across all destinations
+- `uniqueCitiesCount` — count of distinct cities across all destinations
+- Top Country card now shows: country name + "X países · Y ciudades" + comma-list of up to 6 countries visited
+- Top Continent computed from `country_code` (was broken — field never populated)
+
+### `tripToDb()` improvements
+
+- `countries_visited` now counts by `d.country` (falling back to string parse)
+- `cities_visited` now counts unique cities by `d.city` (falling back to `d.lugar`)
+- Trip name generation prefers `d.city` over full `d.lugar`
+
+### CSV export
+
+New columns added (backward compatible — old importers see extra columns, not broken):
+`lugar, city, state, country, country_code, lat, lng, place_id`
+
+`lugar` column now exports the city name (not the full comma string) for readability.
+
+### CSV import
+
+- Reads new columns: `city`, `state`, `country`, `country_code`, `lat`, `lng`, `place_id`
+- If `lat`/`lng` are present, skips geocoding for that destination (fast re-import)
+- `geocodeTrips()` now populates full structured fields (`city`, `state`, `country`, `country_code`, `place_id`, `display_name`) not just `coordinates`
+
+### New CSS (styles.css)
+
+`.place-search-wrapper`, `.place-chips`, `.place-chip`, `.place-chip__flag/name/country/remove`, `.place-search-input-row`, `.place-search-input`, `.place-search-spinner`, `.place-dropdown`, `.place-dropdown__item/flag/text/primary/secondary/msg/error/freetext`, `.destino-card-place-set/name/flag`, mobile breakpoints at 600px.
+
+### Files modified
+
+- `js/app.js`
+- `css/styles.css`
+- `CHANGELOG.md`
+
+---
+
 ## 2026-02-18 — Trip name as primary identifier; destinations as subtitle
 
 ### What changed
