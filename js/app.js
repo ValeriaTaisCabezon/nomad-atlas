@@ -699,7 +699,7 @@ const PlaceSearchInput = ({ selectedPlaces, onAdd, onRemove }) => {
                 setNetworkErr(false);
             }
             setOpen(true);
-        }, 400);
+        }, 200);
     };
 
     const handleSelect = (place) => {
@@ -734,12 +734,18 @@ const PlaceSearchInput = ({ selectedPlaces, onAdd, onRemove }) => {
         if (e.key === 'Escape') { setOpen(false); }
     };
 
-    // Country code → flag emoji (optional, best-effort)
+    // Country code → flag emoji using regional indicator surrogate pairs
     const toFlag = (cc) => {
         if (!cc || cc.length !== 2) return '📍';
         try {
-            return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)));
-        } catch { return '📍'; }
+            const A = 0x1F1E6; // regional indicator A
+            const c1 = cc.toUpperCase().charCodeAt(0) - 65 + A;
+            const c2 = cc.toUpperCase().charCodeAt(1) - 65 + A;
+            if (c1 < A || c2 < A) return cc.toUpperCase();
+            // Use raw surrogate pairs so the emoji renders even on systems
+            // where String.fromCodePoint spread is swallowed
+            return String.fromCodePoint(c1) + String.fromCodePoint(c2);
+        } catch { return cc.toUpperCase(); }
     };
 
     return (
@@ -892,7 +898,7 @@ const DestinoCard = ({ destino, index, formData, onSave, onRemove, isGeocoding, 
                     h('div', {className: 'destino-card-place-set'},
                         h('span', {className: 'destino-card-place-name'}, '📍 ', cityLine),
                         local.country_code && h('span', {className: 'destino-card-place-flag'},
-                            String.fromCodePoint(...[...(local.country_code || '').toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)).filter(n => n >= 0x1F1E6))
+                            (() => { try { const A=0x1F1E6,cc=(local.country_code||'').toUpperCase(); return String.fromCodePoint(cc.charCodeAt(0)-65+A)+String.fromCodePoint(cc.charCodeAt(1)-65+A); } catch(e){ return local.country_code.toUpperCase(); } })()
                         )
                     )
                 ),
@@ -1132,7 +1138,7 @@ const AddTripForm = ({ onAddTrip, allPeople, allDestinations, editingTrip, onCan
                                         }
                                     },
                                     dest.country_code
-                                        ? String.fromCodePoint(...[...(dest.country_code||'').toUpperCase()].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+                                        ? (() => { try { const A=0x1F1E6,cc=(dest.country_code||'').toUpperCase(); return String.fromCodePoint(cc.charCodeAt(0)-65+A)+String.fromCodePoint(cc.charCodeAt(1)-65+A); } catch(e){ return cc; } })()
                                         : '📍',
                                     ' ', dest.city || dest.lugar,
                                     dest.country ? h('span', {style: {opacity: 0.7, marginLeft: '0.25rem', fontSize: '0.8em'}}, dest.country) : null
