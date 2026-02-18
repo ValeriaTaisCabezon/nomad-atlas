@@ -26,6 +26,64 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
+// ── SVG icon system ──────────────────────────────────────────────────────────
+const Icon = ({ name, size = 16, color = 'currentColor', strokeWidth = 1.5 }) => {
+    const paths = {
+        // motivo icons
+        placer:   h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M12 3c-1.2 5.4-5 7.8-5 12a5 5 0 0010 0c0-4.2-3.8-6.6-5-12z M10 17a2 2 0 004 0'}),
+        negocios: h('g', null,
+                    h('rect', {x:'2', y:'7', width:'20', height:'14', rx:'2'}),
+                    h('path', {strokeLinecap:'round', d:'M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2M12 12v3M9 12h6'})
+                  ),
+        evento:   h('g', null,
+                    h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M8 7V3M16 7V3M3 11h18M5 5h14a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z'})
+                  ),
+        familia:  h('g', null,
+                    h('circle', {cx:'8', cy:'7', r:'2'}),
+                    h('circle', {cx:'16', cy:'7', r:'2'}),
+                    h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M3 21v-2a4 4 0 014-4h2M15 15h2a4 4 0 014 4v2M12 11c-1.1 0-2 .9-2 2v8'})
+                  ),
+        estudio:  h('g', null,
+                    h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M12 14l9-5-9-5-9 5 9 5z'}),
+                    h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M12 14l6.16-3.422A12.08 12.08 0 0122 17.5c0 2.485-3.582 4.5-8 4.5s-8-2.015-8-4.5a12.08 12.08 0 013.84-6.922L12 14z'})
+                  ),
+        otro:     h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'}),
+        // stat icons
+        clock:    h('g', null, h('circle', {cx:'12', cy:'12', r:'9'}), h('path', {strokeLinecap:'round', d:'M12 7v5l3 3'})),
+        pin:      h('g', null, h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z'}), h('circle', {cx:'12', cy:'9', r:'2.5'})),
+        globe:    h('g', null, h('circle', {cx:'12', cy:'12', r:'9'}), h('path', {strokeLinecap:'round', d:'M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20'})),
+        plane:    h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z'}),
+        users:    h('g', null, h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2'}), h('circle', {cx:'9', cy:'7', r:'4'}), h('path', {strokeLinecap:'round', d:'M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75'})),
+        edit:     h('g', null, h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7'}), h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z'})),
+        trash:    h('g', null, h('polyline', {points:'3 6 5 6 21 6'}), h('path', {strokeLinecap:'round', strokeLinejoin:'round', d:'M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2'})),
+        chevronL: h('polyline', {points:'15 18 9 12 15 6', strokeLinecap:'round', strokeLinejoin:'round'}),
+        chevronR: h('polyline', {points:'9 18 15 12 9 6', strokeLinecap:'round', strokeLinejoin:'round'}),
+        close:    h('g', null, h('line', {x1:'18', y1:'6', x2:'6', y2:'18', strokeLinecap:'round'}), h('line', {x1:'6', y1:'6', x2:'18', y2:'18', strokeLinecap:'round'})),
+        calendar: h('g', null, h('rect', {x:'3', y:'4', width:'18', height:'18', rx:'2'}), h('path', {strokeLinecap:'round', d:'M16 2v4M8 2v4M3 10h18'})),
+        empty:    h('g', null, h('circle', {cx:'12', cy:'12', r:'9'}), h('path', {strokeLinecap:'round', d:'M8 12h8M12 8v8'})),
+    };
+    return h('svg', {
+        xmlns: 'http://www.w3.org/2000/svg',
+        width: size, height: size,
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        stroke: color,
+        strokeWidth: strokeWidth,
+        style: { display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }
+    }, paths[name] || null);
+};
+
+const getMotivoIcon = (motivo) => {
+    const map = { placer: 'placer', negocios: 'negocios', evento: 'evento', familia: 'familia', estudio: 'estudio', otro: 'otro' };
+    return map[motivo] || 'plane';
+};
+
+const getMotivoLabel = (motivo) => {
+    const labels = { placer: 'Placer', negocios: 'Negocios', evento: 'Evento', familia: 'Familia', estudio: 'Estudio', otro: 'Otro' };
+    return labels[motivo] || motivo || 'Viaje';
+};
+
+// kept for any legacy callers in Timeline / Dashboard
 const getMotivoEmoji = (motivo) => {
     const emojis = { 'placer': '🏖️', 'negocios': '💼', 'evento': '🎉', 'familia': '👨‍👩‍👧‍👦', 'estudio': '📚', 'otro': '🌟' };
     return emojis[motivo] || '✈️';
@@ -1149,22 +1207,290 @@ const WrappedView = ({ trips, selectedYear }) => {
     );
 };
 
-const TripsListView = ({ trips, onTripClick, onEditTrip, onDeleteTrip }) => {
-    if (trips.length === 0) return h('div', {className: 'empty-state'}, h('div', {className: 'empty-state-icon'}, '✈️'), h('div', {className: 'empty-state-text'}, 'No hay viajes registrados a\u00fan'));
+// ── Gradient fallbacks per motivo ─────────────────────────────────────────────
+const MOTIVO_GRADIENTS = {
+    placer:   'linear-gradient(160deg, #6BA3BE 0%, #A8C5A0 100%)',
+    negocios: 'linear-gradient(160deg, #4A5568 0%, #718096 100%)',
+    evento:   'linear-gradient(160deg, #C9A09A 0%, #D4956A 100%)',
+    familia:  'linear-gradient(160deg, #89ACA4 0%, #B7C4A1 100%)',
+    estudio:  'linear-gradient(160deg, #A3B1B8 0%, #8B9A6D 100%)',
+    otro:     'linear-gradient(160deg, #C4A882 0%, #D9C4A0 100%)',
+};
+const getGradient = (motivo) => MOTIVO_GRADIENTS[motivo] || MOTIVO_GRADIENTS.otro;
+
+// ── TripsCarousel ─────────────────────────────────────────────────────────────
+const TripsCarousel = ({ trips, onEditTrip, onDeleteTrip }) => {
+    // centeredId: card that has been scrolled to centre (pre-expand highlight)
+    // expandedId: card that is currently expanded inside the track
+    const [centeredId, setCenteredId] = useState(null);
+    const [expandedId, setExpandedId] = useState(null);
+    const trackRef = useRef(null);
+    const cardRefs = useRef({});
+
     const sortedTrips = [...trips].sort((a, b) => new Date(b.fechaInicio) - new Date(a.fechaInicio));
 
-    return (
-        h('div', null,
-            h('div', {style: {display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}},
-                h('h2', {style: {fontSize: '2rem', color: 'var(--secondary)'}}, 'Todos los Viajes')
-            ),
-            h('div', {className: 'trips-list'},
-                sortedTrips.map(trip => (
-                    h(TripCard, {key: trip.id, trip: trip, onClick: () => onTripClick(trip), showEditButton: true, onEdit: onEditTrip, onDelete: onDeleteTrip})
-                ))
-            )
-        )
+    // ── helper: is card already roughly centred in the track? ────────────────
+    const isCentered = (tripId) => {
+        const track = trackRef.current;
+        const card  = cardRefs.current[tripId];
+        if (!track || !card) return false;
+        const trackMid = track.scrollLeft + track.clientWidth / 2;
+        const cardMid  = card.offsetLeft  + card.offsetWidth  / 2;
+        return Math.abs(cardMid - trackMid) < 40;
+    };
+
+    // ── scroll a card to the track centre ────────────────────────────────────
+    const scrollToCard = (tripId) => {
+        const track = trackRef.current;
+        const card  = cardRefs.current[tripId];
+        if (!track || !card) return;
+        const offset = card.offsetLeft + card.offsetWidth / 2 - track.clientWidth / 2;
+        track.scrollTo({ left: offset, behavior: 'smooth' });
+    };
+
+    // ── after expansion, re-centre so the wider card stays centred ───────────
+    useEffect(() => {
+        if (!expandedId) return;
+        // small delay so the card has started growing before we measure
+        const t = setTimeout(() => scrollToCard(expandedId), 60);
+        return () => clearTimeout(t);
+    }, [expandedId]);
+
+    // ── card click logic ──────────────────────────────────────────────────────
+    const handleCardClick = (trip, e) => {
+        e.stopPropagation(); // prevent track's click-outside from firing
+
+        if (expandedId === trip.id) {
+            // clicking the already-expanded card collapses it
+            setExpandedId(null);
+            return;
+        }
+        if (expandedId && expandedId !== trip.id) {
+            // another card is open — collapse it, then centre & expand the new one
+            setExpandedId(null);
+            setCenteredId(trip.id);
+            scrollToCard(trip.id);
+            setTimeout(() => setExpandedId(trip.id), 320);
+            return;
+        }
+        if (!isCentered(trip.id)) {
+            // first click on an off-centre card → just centre it
+            setCenteredId(trip.id);
+            scrollToCard(trip.id);
+            return;
+        }
+        // card is centred and nothing is expanded → expand
+        setCenteredId(trip.id);
+        setExpandedId(trip.id);
+    };
+
+    // ── click on track background → collapse ────────────────────────────────
+    const handleTrackClick = () => {
+        if (expandedId) setExpandedId(null);
+    };
+
+    const collapse = () => setExpandedId(null);
+
+    // ── Escape key ───────────────────────────────────────────────────────────
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') collapse(); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
+    // ── tilt on scroll (skip expanded card) ──────────────────────────────────
+    useEffect(() => {
+        const track = trackRef.current;
+        if (!track) return;
+        const updateTilts = () => {
+            const trackMid = track.scrollLeft + track.clientWidth / 2;
+            sortedTrips.forEach(trip => {
+                const card = cardRefs.current[trip.id];
+                if (!card || trip.id === expandedId) return;
+                const cardMid = card.offsetLeft + card.offsetWidth / 2;
+                const norm    = Math.max(-1, Math.min(1, (cardMid - trackMid) / (track.clientWidth * 0.6)));
+                card.style.transform = `rotateY(${norm * 22}deg) scale(${1 - Math.abs(norm) * 0.1})`;
+            });
+        };
+        track.addEventListener('scroll', updateTilts, { passive: true });
+        updateTilts();
+        return () => track.removeEventListener('scroll', updateTilts);
+    }, [sortedTrips, expandedId]);
+
+    // ── mouse wheel → horizontal scroll ──────────────────────────────────────
+    useEffect(() => {
+        const track = trackRef.current;
+        if (!track) return;
+        const onWheel = (e) => {
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+            e.preventDefault();
+            track.scrollLeft += e.deltaY;
+        };
+        track.addEventListener('wheel', onWheel, { passive: false });
+        return () => track.removeEventListener('wheel', onWheel);
+    }, []);
+
+    // ── arrow buttons ─────────────────────────────────────────────────────────
+    const scrollBy = (dir) => {
+        if (!trackRef.current) return;
+        trackRef.current.scrollBy({ left: dir * 260, behavior: 'smooth' });
+    };
+
+    if (trips.length === 0) {
+        return h('div', {className: 'carousel-empty'},
+            h(Icon, {name: 'plane', size: 48, color: 'var(--text-muted)'}),
+            h('p', null, 'No hay viajes registrados aún')
+        );
+    }
+
+    return h('div', {className: 'carousel-root'},
+
+        // ── arrow left ────────────────────────────────────────────────────────
+        h('button', {
+            className: 'carousel-arrow carousel-arrow--left',
+            onClick: (e) => { e.stopPropagation(); scrollBy(-1); },
+            'aria-label': 'Anterior'
+        }, h(Icon, {name: 'chevronL', size: 20})),
+
+        // ── track (click on empty area → collapse) ────────────────────────────
+        h('div', {
+            className: 'carousel-track',
+            ref: trackRef,
+            onClick: handleTrackClick
+        },
+            // spacer so the first card can reach the centre
+            h('div', {className: 'carousel-spacer', 'aria-hidden': 'true'}),
+
+            sortedTrips.map(trip => {
+                const isExpanded    = expandedId === trip.id;
+                const isCenteredNow = centeredId === trip.id && !isExpanded;
+                const firstDest     = trip.destinos[0];
+                const duracion      = trip.fechaFinal
+                    ? Math.ceil((new Date(trip.fechaFinal) - new Date(trip.fechaInicio)) / 86400000) : 1;
+                const uniqueCountries = [...new Set(trip.destinos.map(d => {
+                    const parts = d.lugar.split(',');
+                    return parts[parts.length - 1].trim();
+                }))].length;
+
+                return h('div', {
+                    key: trip.id,
+                    ref: el => { cardRefs.current[trip.id] = el; },
+                    className: [
+                        'carousel-card',
+                        isExpanded    ? 'carousel-card--expanded'  : '',
+                        isCenteredNow ? 'carousel-card--centered'  : '',
+                    ].filter(Boolean).join(' '),
+                    onClick: (e) => handleCardClick(trip, e),
+                    style: { background: firstDest?.foto ? 'none' : getGradient(trip.motivo) }
+                },
+                    // photo background
+                    firstDest?.foto && h('div', {
+                        className: 'carousel-card__bg-photo',
+                        style: { backgroundImage: `url(${firstDest.foto})` }
+                    }),
+
+                    // collapsed state content
+                    !isExpanded && h('div', {className: 'carousel-card__scrim'}),
+                    !isExpanded && h('div', {className: 'carousel-card__tag'},
+                        h(Icon, {name: getMotivoIcon(trip.motivo), size: 12, color: 'currentColor', strokeWidth: 2}),
+                        h('span', null, getMotivoLabel(trip.motivo))
+                    ),
+                    !isExpanded && h('div', {className: 'carousel-card__label'},
+                        h('div', {className: 'carousel-card__title'},
+                            trip.destinos.map(d => d.lugar.split(',')[0].trim()).join(' → ')
+                        ),
+                        h('div', {className: 'carousel-card__date'},
+                            formatDateRange(trip.fechaInicio, trip.fechaFinal)
+                        )
+                    ),
+
+                    // expanded state content
+                    isExpanded && h('div', {
+                        className: 'carousel-card__expanded-panel',
+                        onClick: e => e.stopPropagation()
+                    },
+                        h('button', {
+                            className: 'carousel-card__close',
+                            onClick: (e) => { e.stopPropagation(); collapse(); },
+                            'aria-label': 'Cerrar'
+                        }, h(Icon, {name: 'close', size: 18, strokeWidth: 2})),
+
+                        h('h2', {className: 'carousel-exp__title'},
+                            trip.destinos.map(d => d.lugar.split(',')[0].trim()).join(' → ')
+                        ),
+                        h('div', {className: 'carousel-exp__date'},
+                            h(Icon, {name: 'calendar', size: 14, color: 'var(--text-secondary)', strokeWidth: 1.8}),
+                            h('span', null, formatDateRange(trip.fechaInicio, trip.fechaFinal))
+                        ),
+                        h('div', {className: 'carousel-exp__stats'},
+                            h('div', {className: 'carousel-exp__stat'},
+                                h(Icon, {name: 'clock', size: 15, strokeWidth: 1.8}),
+                                h('span', {className: 'carousel-exp__stat-value'}, duracion),
+                                h('span', {className: 'carousel-exp__stat-label'}, 'días')
+                            ),
+                            h('div', {className: 'carousel-exp__divider'}),
+                            h('div', {className: 'carousel-exp__stat'},
+                                h(Icon, {name: 'pin', size: 15, strokeWidth: 1.8}),
+                                h('span', {className: 'carousel-exp__stat-value'}, trip.destinos.length),
+                                h('span', {className: 'carousel-exp__stat-label'}, 'lugares')
+                            ),
+                            h('div', {className: 'carousel-exp__divider'}),
+                            h('div', {className: 'carousel-exp__stat'},
+                                h(Icon, {name: 'globe', size: 15, strokeWidth: 1.8}),
+                                h('span', {className: 'carousel-exp__stat-value'}, uniqueCountries),
+                                h('span', {className: 'carousel-exp__stat-label'}, uniqueCountries === 1 ? 'país' : 'países')
+                            ),
+                            h('div', {className: 'carousel-exp__divider'}),
+                            h('div', {className: 'carousel-exp__stat'},
+                                h(Icon, {name: getMotivoIcon(trip.motivo), size: 15, strokeWidth: 1.8}),
+                                h('span', {className: 'carousel-exp__stat-label'}, getMotivoLabel(trip.motivo))
+                            ),
+                            trip.personas.length > 0 && h('div', {className: 'carousel-exp__divider'}),
+                            trip.personas.length > 0 && h('div', {className: 'carousel-exp__stat'},
+                                h(Icon, {name: 'users', size: 15, strokeWidth: 1.8}),
+                                h('span', {className: 'carousel-exp__stat-value'}, trip.personas.length),
+                                h('span', {className: 'carousel-exp__stat-label'}, 'personas')
+                            )
+                        ),
+                        trip.destinos.length > 1 && h('div', {className: 'carousel-exp__dests'},
+                            trip.destinos.map((d, i) =>
+                                h('div', {key: i, className: 'carousel-exp__dest'},
+                                    h(Icon, {name: 'pin', size: 12, color: 'var(--primary)', strokeWidth: 2}),
+                                    h('span', null, d.lugar)
+                                )
+                            )
+                        ),
+                        trip.notas && h('p', {className: 'carousel-exp__notes'}, trip.notas),
+                        h('div', {className: 'carousel-exp__actions'},
+                            h('button', {
+                                className: 'carousel-exp__btn carousel-exp__btn--edit',
+                                onClick: (e) => { e.stopPropagation(); collapse(); onEditTrip(trip); }
+                            }, h(Icon, {name: 'edit', size: 14, strokeWidth: 2}), h('span', null, 'Editar')),
+                            h('button', {
+                                className: 'carousel-exp__btn carousel-exp__btn--delete',
+                                onClick: (e) => { e.stopPropagation(); collapse(); onDeleteTrip(trip.id); }
+                            }, h(Icon, {name: 'trash', size: 14, strokeWidth: 2}), h('span', null, 'Eliminar'))
+                        )
+                    )
+                );
+            }),
+
+            // spacer so the last card can reach the centre
+            h('div', {className: 'carousel-spacer', 'aria-hidden': 'true'})
+        ),
+
+        // ── arrow right ───────────────────────────────────────────────────────
+        h('button', {
+            className: 'carousel-arrow carousel-arrow--right',
+            onClick: (e) => { e.stopPropagation(); scrollBy(1); },
+            'aria-label': 'Siguiente'
+        }, h(Icon, {name: 'chevronR', size: 20}))
     );
+};
+
+// ── Legacy wrapper (kept so existing callers don't break) ─────────────────────
+const TripsListView = ({ trips, onTripClick, onEditTrip, onDeleteTrip }) => {
+    return h(TripsCarousel, { trips, onEditTrip, onDeleteTrip });
 };
 
 const App = () => {
@@ -1431,15 +1757,23 @@ const App = () => {
 
                     activeTab === 'trips' && profile && (
                         h(React.Fragment, null,
-                            h('div', {style: {display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}},
-                                h('button', {className: 'btn-primary', onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }},
-                                    showAddForm ? '\u2715 Cerrar Formulario' : '+ Nuevo Viaje'
-                                )
-                            ),
+                            h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip}),
                             (showAddForm || editingTrip) && (
                                 h(AddTripForm, {onAddTrip: (trip) => { handleAddTrip(trip); setShowAddForm(false); }, allPeople: allPeople, allDestinations: allDestinations, editingTrip: editingTrip, onCancelEdit: () => { setEditingTrip(null); setShowAddForm(false); }, existingTrips: trips, showToast: showToast, onImportTrips: handleImportTrips})
                             ),
-                            h(TripsListView, {trips: filteredTrips, onTripClick: setSelectedTrip, onEditTrip: (trip) => { handleEditTrip(trip); setShowAddForm(true); }, onDeleteTrip: handleDeleteTrip})
+                            h('div', {className: 'trips-add-bar'},
+                                h('button', {
+                                    className: 'trips-add-btn' + (showAddForm ? ' trips-add-btn--open' : ''),
+                                    onClick: () => { setEditingTrip(null); setShowAddForm(!showAddForm); }
+                                },
+                                    h('svg', {width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round'},
+                                        showAddForm
+                                            ? h('path', {d: 'M18 6 6 18M6 6l12 12'})
+                                            : h(React.Fragment, null, h('line', {x1: 12, y1: 5, x2: 12, y2: 19}), h('line', {x1: 5, y1: 12, x2: 19, y2: 12}))
+                                    ),
+                                    showAddForm ? 'Cerrar' : 'Nuevo Viaje'
+                                )
+                            )
                         )
                     ),
 

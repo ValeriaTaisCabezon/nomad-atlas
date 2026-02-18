@@ -1,5 +1,151 @@
 # Changelog
 
+## 2026-02-17 — Carousel: expanded card fits viewport (v2 — preserve collapsed size)
+
+### Fix
+
+Reverted the previous attempt that changed collapsed card height. Instead, only the expanded card's internal proportions were adjusted so its content fits within `calc(100% - 2rem)` of track height without scrolling.
+
+**Changes:**
+- Collapsed card height restored to `340px` (original, user-approved size)
+- Photo hero in expanded state reduced from `48%` → `36%` — gives the info panel much more room
+- Info panel height updated from `52%` → `64%` to match
+- Panel padding reduced from `1rem 1.4rem 1.1rem` → `0.65rem 1.4rem 0.75rem`
+- Panel gap reduced from `0.55rem` → `0.4rem`
+- Stats row padding reduced from `0.5rem 0.7rem` → `0.35rem 0.7rem`
+
+### Files modified
+- `css/styles.css`
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Carousel: expanded card fits viewport without scrolling
+
+### Fix
+
+The expanded card overflowed the screen vertically, requiring the user to scroll to see the info panel.
+
+**Root cause:** Card height was `min(80vh, 680px)` measured from the card element itself, but the card sat inside a track with `padding: 3rem 0`, which in turn sat inside `.carousel-root` with `padding: 2rem 0 3rem` — both adding to the total height before it even left the content area.
+
+**Solution:** The track is now the single source of truth for vertical sizing:
+- `.carousel-track` has `height: calc(100vh - 120px)` (viewport minus navbar + content header), `align-items: center` (vertically centres all cards), `overflow-y: hidden` (hard clip so nothing can bleed out).
+- Collapsed cards: `height: 72%` (relative to track height) — always fits with room to breathe above/below.
+- Expanded card: `height: calc(100% - 2rem)` (nearly full track height, 1rem margin each side) — guaranteed to fit without any scroll.
+- `.carousel-root` padding removed (no longer needed).
+
+### Files modified
+- `css/styles.css` — `.carousel-root` padding removed; `.carousel-track` gets explicit `height`, `align-items: center`, `overflow-y: hidden`; `.carousel-card` height changed to `72%`; `.carousel-card--expanded` height changed to `calc(100% - 2rem)`; responsive breakpoints updated
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Carousel: edge cards can now always reach centre
+
+### Fix
+
+First and last cards could not scroll to the track centre, making them impossible to expand.
+
+**Root cause:** The track had fixed horizontal padding (`4rem` each side), which was never enough for the first/last card to reach the midpoint — especially on wide screens.
+
+**Solution:** Two invisible `div.carousel-spacer` elements placed before the first card and after the last card inside the flex row. Each spacer is `calc(50vw - 120px)` wide (half the viewport minus half a collapsed card), which guarantees any card can be scrolled to the exact horizontal centre regardless of screen width. The fixed horizontal padding on `.carousel-track` was removed and replaced by these spacers.
+
+### Files modified
+- `js/app.js` — two `h('div', {className: 'carousel-spacer'})` added around the `sortedTrips.map(...)` output
+- `css/styles.css` — `.carousel-spacer` rule added; `.carousel-track` horizontal padding removed
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Carousel: in-track expansion + click-outside collapse
+
+### What changed
+
+1. **Expanded card lives inside the flex row** — removed `position:fixed` popup approach. The card now grows via CSS `width`/`height` transitions while staying a real flex item, pushing adjacent cards to the sides. The card self-centres in the track 60 ms after expansion via a `scrollTo` call.
+
+2. **Click outside to collapse** — `onClick` handler on `.carousel-track` calls `collapse()`. Card and panel use `e.stopPropagation()` so clicks inside the expanded card do not trigger this. Arrow buttons also stop propagation.
+
+3. **Photo hero transitions** — `carousel-card__bg-photo` now transitions its `height` (full card → 48%) as the card expands, instead of being torn out into a separate element.
+
+### Files modified
+- `js/app.js` — `TripsCarousel`: removed fixed-card IIFE, content now rendered directly inside each card element; `handleTrackClick` added; `useEffect` re-centres after expansion
+- `css/styles.css` — `.carousel-card--expanded` uses `width`/`height` only (no `position:fixed`); `.carousel-card__bg-photo` uses `height` transition; removed `.carousel-expanded-card` and all related rules
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Carousel interaction fixes (4 bugs)
+
+### Fixes
+
+1. **Click-to-center then click-to-expand** — First click on an off-centre card now only scrolls it to the viewport centre (ring highlight appears). Second click (card already centred) expands it. Expanded card can only be closed via the × button or Escape. Logic uses `centeredId` + `isCentered()` tolerance check (32 px).
+
+2. **Removed background overlay** — Dim overlay behind expanded card removed completely (both render and CSS). Expanded card now floats above the carousel with its own box-shadow only.
+
+3. **Expanded card: fixed-position, no scroll** — Expanded card is now `position: fixed; top:50%; left:50%; transform:translate(-50%,-50%)` (lifted fully out of the track flow). Panel height is exactly 52% with `overflow:hidden`; all sections (`stats`, `dests`, `notes`, `actions`) use `flex-shrink` to fit without any internal scroll. Notes truncate to 2 lines, destination labels truncate with `text-overflow:ellipsis`.
+
+4. **Mouse wheel → horizontal scroll** — Added a `wheel` event listener on the track (`passive:false`) that maps vertical `deltaY` to `scrollLeft`. Horizontal trackpad swipes (where `|deltaX| > |deltaY|`) pass through unmodified.
+
+### Files modified
+- `js/app.js` — `TripsCarousel` rewrite (centeredId state, isCentered helper, wheel listener, fixed expanded card outside track)
+- `css/styles.css` — removed `.carousel-overlay`, added `.carousel-expanded-card` (fixed + animated), updated `.carousel-card__expanded-panel` (no overflow), `.carousel-card--centered` (ring highlight)
+- `CHANGELOG.md`
+
+---
+
+## 2026-02-17 — Trips section: horizontal 3D carousel with expand/collapse
+
+### What changed
+
+Replaced the flat grid (`TripsListView`) with a new `TripsCarousel` component.
+Cards now display in a horizontal scrollable row with a perspective 3D tilt effect.
+Clicking a card expands it in-place to reveal full trip details.
+
+### SVG icon system
+
+Added a reusable `Icon` component (pure SVG, no emoji) with the following icons:
+`placer · negocios · evento · familia · estudio · otro` (motivo icons)
+`clock · pin · globe · plane · users · edit · trash · chevronL · chevronR · close · calendar · empty`
+
+Added helpers `getMotivoIcon(motivo)` and `getMotivoLabel(motivo)`.
+`getMotivoEmoji` is kept for legacy callers (Timeline, Dashboard).
+
+### Carousel — collapsed card (portrait, 240 × 340 px)
+- Full-bleed photo or motivo gradient background
+- Frosted-glass pill tag top-left (SVG icon + motivo label)
+- Gradient scrim → trip name + date pinned at bottom
+- 3D `rotateY` tilt updated live on scroll via scroll listener
+- `scroll-snap-type: x mandatory` for native snap behaviour
+- Arrow buttons (left / right) scroll by one card width
+
+### Carousel — expanded card (~85 vw × 82 vh)
+- Card grows in place; `z-index` elevates above a full-screen dim overlay
+- **Top 52%:** hero photo (or gradient)
+- **Bottom 52%:** white panel slides up with:
+  - Trip name (Exo 2, bold)
+  - Date range with calendar icon
+  - Stats row: days · locations · countries · motivo type · companions
+    (dividers between stats, à la cards-inspo-1)
+  - Destination list (when > 1 stop)
+  - Notes (italic, if present)
+  - Edit + Delete pill buttons
+- Close × button (top-right of panel); Escape key also collapses
+- Body scroll locked while a card is expanded
+
+### Gradient fallbacks per motivo
+`placer` blue-teal · `negocios` charcoal · `evento` terracotta · `familia` sage · `estudio` blue-gray · `otro` sand
+
+### Responsive
+- Mobile (≤ 768px): cards 200 × 300 px, arrows hidden (swipe only)
+- Small phone (≤ 480px): cards 180 × 270 px, expanded 95 vw × 88 vh
+
+### Files modified
+- `js/app.js` — `Icon` component, `getMotivoIcon`, `getMotivoLabel`, `MOTIVO_GRADIENTS`, `TripsCarousel` (new), `TripsListView` (thin wrapper)
+- `css/styles.css` — full carousel block (`.carousel-root`, `.carousel-track`, `.carousel-card`, `.carousel-card--expanded`, expanded panel, stat row, arrow buttons, responsive breakpoints)
+- `CHANGELOG.md`
+
+---
+
 ## 2026-02-17 — Fix: border wraps content box, tab overlap works
 
 ### What changed
